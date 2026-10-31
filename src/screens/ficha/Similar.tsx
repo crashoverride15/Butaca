@@ -1,18 +1,19 @@
 import { useEffect, useState } from 'react';
 import { ensureRatings } from '../../api/omdb';
-import { getTitle } from '../../api/tmdb';
+import { discover, getTitle } from '../../api/tmdb';
 import { PosterTile } from '../../components/PosterTile';
 import { parseKey, titleToCard } from '../../logic/cards';
 import { platformLabel } from '../../logic/platform';
 import { candidateKeys, similarTo, type SimilarItem } from '../../logic/similar';
 import { todayIso, watchStatus } from '../../logic/status';
+import { discoverByKeywords } from '../../logic/featured';
 import { getAllEntries } from '../../store/library';
 import { getTitleCached } from '../../store/titles';
 import type { Provider, Title } from '../../store/types';
 
 // "Parecidas" — spec §9.2 (6) and §7.1.
 
-const MAX_LOADS = 20;
+const MAX_LOADS = 40;
 
 async function loadCandidates(keys: string[]): Promise<Title[]> {
   const out: Title[] = [];
@@ -46,7 +47,11 @@ export function Similar({ title, mine }: { title: Title; mine: Provider[] }) {
     void (async () => {
       const entries = await getAllEntries();
       const library = Object.fromEntries(entries.map((e) => [e.key, e]));
-      const candidates = await loadCandidates(candidateKeys(title, library));
+      // beyond TMDB's own list: titles on my platforms that carry the same themes (D35)
+      const byPlot = await discover(title.type, discoverByKeywords(title.keywords.slice(0, 8), mine), 1).catch(() => null);
+      const plotKeys = title.keywords.length > 0 && mine.length > 0 ? (byPlot?.items ?? []).slice(0, 20).map((c) => c.key) : [];
+      const keys = [...new Set([...candidateKeys(title, library), ...plotKeys])].filter((k) => k !== title.key);
+      const candidates = await loadCandidates(keys);
       const today = todayIso();
       const seen = new Set(candidates.filter((c) => watchStatus(c, library[c.key], today) === 'vista').map((c) => c.key));
       const result = similarTo({ target: title, targetEntry: library[title.key], candidates, library, seen, mine });
@@ -66,7 +71,7 @@ export function Similar({ title, mine }: { title: Title; mine: Provider[] }) {
     <section className="ficha__section" aria-labelledby="similar-h">
       <div className="ficha__section-head">
         <h2 id="similar-h" className="t-section">Parecidas</h2>
-        <span className="ficha__counter ellipsis">Mismos tags y época · sin vistas</span>
+        <span className="ficha__counter ellipsis">Misma trama · sin vistas</span>
       </div>
       <div className="carousel">
         {items === null

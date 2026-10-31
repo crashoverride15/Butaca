@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildKindProfile, EYEBROW, pickFeatured } from '../src/logic/featured';
+import { buildKindProfile, EYEBROW, pickFeatured, recommendedKeys, topKeywords } from '../src/logic/featured';
 import { diffSnapshot, isNew, noveltyDue, recentArrivals, relativeArrival, DAY_MS } from '../src/logic/novelties';
 import { runRefresh, refreshDue, REFRESH_INTERVAL_MS } from '../src/logic/refresh';
 import { isFollowed, seasonAlerts } from '../src/logic/seasons';
-import { candidateKeys, commonCaption, pairScore, plotCaption, similarTo } from '../src/logic/similar';
+import { candidateKeys, momentMatch, plotCaption, similarTo, stems } from '../src/logic/similar';
 import { addAlerts, listAlerts, markRead, unreadCount } from '../src/store/alerts';
 import { emptyEntry, getEntry, saveEntry } from '../src/store/library';
 import { getSettings, saveSettings } from '../src/store/settings';
@@ -23,17 +23,6 @@ const mine = [{ id: 119, name: 'Prime' }];
 describe('similar (spec §7.1)', () => {
   const target = title('movie:1', { genres: [{ id: 80, name: 'Crimen' }, { id: 28, name: 'Acción' }], keywords: [1, 2, 3, 4, 5, 6], year: 1995 });
 
-  it('adds up each rule', () => {
-    const c = title('movie:2', { genres: [{ id: 80, name: 'Crimen' }], keywords: [1, 2, 3, 4, 5, 6], year: 1999, ratings: { imdb: 8, rt: null, fetchedAt: 1 } });
-    // 3 tags + 2 genre + 4 keywords(max) + 3 decade + 2 country + 1 recommended + 1 imdb>=7.5
-    const r = pairScore({ title: c, tagIds: ['a'] }, { title: target, tagIds: ['a'] }, true);
-    expect(r.score).toBe(3 + 2 + 4 + 3 + 2 + 1 + 1);
-    expect(r.common).toBe(1 + 1 + 1);
-  });
-  it('contiguous decade is worth 1', () => {
-    const c = title('movie:3', { year: 2003 });
-    expect(pairScore({ title: c, tagIds: [] }, { title: target, tagIds: [] }, false).score).toBe(1 + 2);
-  });
   it('drops seen titles, those off my platforms and those with no plot link; orders by score then IMDb; caps at 12', () => {
     const library: Record<string, LibraryEntry> = {};
     const plot = { genres: [{ id: 80, name: 'Crimen' }], keywords: [1, 2, 3] };
@@ -50,7 +39,7 @@ describe('similar (spec §7.1)', () => {
     expect(out.map((i) => i.title.key)).toEqual(['movie:3', 'movie:2']);
     expect(out.map((i) => i.caption)).toEqual(['Recomendada por TMDB', '3 temas en común']);
     const many = Array.from({ length: 30 }, (_, i) => title(`movie:${100 + i}`, plot));
-    expect(similarTo({ target: t, candidates: many, library, seen: new Set(), mine })).toHaveLength(12);
+    expect(similarTo({ target: { ...t, recommendations: many.map((m) => m.key) }, candidates: many, library, seen: new Set(), mine })).toHaveLength(12);
   });
   it('a cartoon does not stand in for a live-action show, even with the same genres and tags (Person of Interest vs Invincible)', () => {
     const poi = title('tv:1', { type: 'tv', genres: [{ id: 80, name: 'Crimen' }, { id: 18, name: 'Drama' }], keywords: [10, 11, 12, 13], year: 2011 });
@@ -59,19 +48,65 @@ describe('similar (spec §7.1)', () => {
     const lib = { 'tv:1': entry('tv:1', { tagIds: ['estilo:thriller'] }), 'tv:2': entry('tv:2', { tagIds: ['estilo:thriller'] }) } as Record<string, LibraryEntry>;
     const out = similarTo({ target: poi, targetEntry: lib['tv:1'], candidates: [invincible, mindhunter], library: lib, seen: new Set(), mine });
     expect(out.map((i) => i.title.key)).toEqual(['tv:3']);
-    // recommended by TMDB but animated: allowed, yet far below a live-action match
+    // not even when TMDB recommends it: a cartoon is not live action
     const rec = similarTo({ target: { ...poi, recommendations: ['tv:2'] }, candidates: [invincible, mindhunter], library: lib, seen: new Set(), mine });
-    expect(rec.map((i) => i.title.key)).toEqual(['tv:3', 'tv:2']);
+    expect(rec.map((i) => i.title.key)).toEqual(['tv:3']);
+  });
+  it('Person of Interest does not get Futurama: no genre in common and a cartoon, however many generic themes they share', () => {
+    const poi = title('tv:1', { type: 'tv', genres: [{ id: 80, name: 'Crimen' }, { id: 18, name: 'Drama' }, { id: 10765, name: 'Sci-Fi' }], keywords: [1, 2, 3, 4], year: 2011 });
+    const futurama = title('tv:2', { type: 'tv', genres: [{ id: 16, name: 'Animación' }, { id: 35, name: 'Comedia' }, { id: 10765, name: 'Sci-Fi' }], keywords: [1, 2, 3], year: 1999 });
+    const out = similarTo({ target: { ...poi, similar: ['tv:2'] }, candidates: [futurama], library: {}, seen: new Set(), mine });
+    expect(out).toEqual([]);
+  });
+  it('a live-action show with other genres needs more than generic themes', () => {
+    const t = title('tv:1', { type: 'tv', genres: [{ id: 80, name: 'Crimen' }], keywords: [1, 2, 3], year: 2011 });
+    const wrongGenre = title('tv:2', { type: 'tv', genres: [{ id: 35, name: 'Comedia' }], keywords: [1, 2, 3], year: 2011 });
+    expect(similarTo({ target: t, candidates: [wrongGenre], library: {}, seen: new Set(), mine })).toEqual([]);
+  });
+  it('a theme every candidate has proves little: the rare one wins', () => {
+    const crime = [{ id: 80, name: 'Crimen' }];
+    const t = title('movie:1', { genres: crime, keywords: [1, 2, 99] });
+    const common = Array.from({ length: 8 }, (_, i) => title(`movie:${10 + i}`, { genres: crime, keywords: [1, 2] }));
+    const rare = title('movie:50', { genres: crime, keywords: [99, 98] });
+    const out = similarTo({ target: t, candidates: [...common, rare], library: {}, seen: new Set(), mine });
+    expect(out[0].title.key).toBe('movie:50');
+  });
+  it('the synopsis links two titles that share no keyword', () => {
+    const crime = [{ id: 80, name: 'Crimen' }];
+    const t = title('tv:1', { type: 'tv', genres: crime, overview: 'Un exmilitar y un millonario evitan crímenes con una máquina que predice asesinatos en Nueva York' });
+    const same = title('tv:2', { type: 'tv', genres: crime, overview: 'Una máquina que predice asesinatos permite a un exmilitar evitar crímenes en la ciudad' });
+    const other = title('tv:3', { type: 'tv', genres: crime, overview: 'Una chef recupera su restaurante familiar durante una difícil temporada de verano' });
+    const out = similarTo({ target: t, candidates: [same, other], library: {}, seen: new Set(), mine });
+    expect(out.map((i) => i.title.key)).toEqual(['tv:2']);
+    expect(out[0].caption).toBe('Parecida en la trama');
+  });
+  it('stems drop accents, small words and plural endings', () => {
+    expect(stems('Las máquinas predicen asesinatos')).toEqual(['maquin', 'predic', 'asesin']);
+  });
+  it('keeps the moment: a Random series is not offered for one of Entre semana, a same-moment one goes first', () => {
+    const crime = [{ id: 80, name: 'Crimen' }];
+    const t = title('tv:1', { type: 'tv', genres: crime, keywords: [1, 2, 3], recommendations: ['tv:2', 'tv:3', 'tv:4'] });
+    const random = title('tv:2', { type: 'tv', genres: crime, keywords: [1, 2, 3] });
+    const weekday = title('tv:3', { type: 'tv', genres: crime, keywords: [1, 2, 3] });
+    const untagged = title('tv:4', { type: 'tv', genres: crime, keywords: [1] });
+    const lib = {
+      'tv:1': entry('tv:1', { tagIds: ['momento:entre-semana'] }),
+      'tv:2': entry('tv:2', { tagIds: ['momento:random'] }),
+      'tv:3': entry('tv:3', { tagIds: ['momento:entre-semana'] }),
+    } as Record<string, LibraryEntry>;
+    const out = similarTo({ target: t, targetEntry: lib['tv:1'], candidates: [random, weekday, untagged], library: lib, seen: new Set(), mine });
+    expect(out.map((i) => i.title.key)).toEqual(['tv:3', 'tv:4']);
+  });
+  it('moment match only disagrees when both have a moment tag', () => {
+    expect(momentMatch(['momento:random'], ['momento:entre-semana'])).toBe('different');
+    expect(momentMatch(['momento:random', 'estilo:thriller'], ['momento:random'])).toBe('same');
+    expect(momentMatch(['estilo:thriller'], ['momento:random'])).toBe('unknown');
+    expect(momentMatch([], [])).toBe('unknown');
   });
   it('plot captions', () => {
     expect(plotCaption(true, 0)).toBe('Recomendada por TMDB');
     expect(plotCaption(false, 3)).toBe('3 temas en común');
-    expect(plotCaption(false, 1)).toBe('Parecida en tema');
-  });
-  it('captions: shared tags or "Recomendada por TMDB"', () => {
-    expect(commonCaption(0)).toBe('Recomendada por TMDB');
-    expect(commonCaption(1)).toBe('1 tag en común');
-    expect(commonCaption(4)).toBe('4 tags en común');
+    expect(plotCaption(false, 1)).toBe('Parecida en la trama');
   });
   it('candidates are TMDB recommendations, similar and my own of the same kind, without the target', () => {
     const t = title('movie:1', { recommendations: ['movie:2'], similar: ['movie:3', 'movie:2'] });
@@ -80,7 +115,7 @@ describe('similar (spec §7.1)', () => {
   });
 });
 
-describe('featured (D28: movies / series)', () => {
+describe('featured (D28, D35: movies / series, by taste)', () => {
   const titles = {
     'movie:1': title('movie:1', { genres: [{ id: 80, name: 'Crimen' }], year: 1995 }),
     'movie:2': title('movie:2', { genres: [{ id: 80, name: 'Crimen' }], year: 1996, ratings: { imdb: 8, rt: null, fetchedAt: 1 } }),
@@ -98,18 +133,49 @@ describe('featured (D28: movies / series)', () => {
     expect(buildKindProfile('tv', entries, titles).refs.map((r) => r.title.key)).toEqual(['tv:5']);
     expect(buildKindProfile('tv', [entry('movie:1', { myScore: 9 })], titles).refs).toHaveLength(0);
   });
-  it('offers my saved titles of the kind first, then discoveries, then a well-rated one I saw; never another kind', () => {
-    const entries = [
-      entry('movie:1', { myScore: 9, seenAt: 1 }),
-      entry('movie:2', { inWatchlist: true }),
-      entry('movie:3', { inWatchlist: true }),
-      entry('tv:5', { type: 'tv', inWatchlist: true }),
+  it('offers titles that follow from what I rated well, never another kind and never one I have rated or seen', () => {
+    const fav = title('movie:1', { genres: [{ id: 80, name: 'Crimen' }], keywords: [1, 2, 3], year: 1995, recommendations: ['movie:7', 'movie:8'] });
+    const entries = [entry('movie:1', { myScore: 9, seenAt: 1 }), entry('movie:8', { myScore: 4, seenAt: 1 })];
+    const discovered = [
+      title('movie:7', { genres: [{ id: 80, name: 'Crimen' }], year: 1997 }), // recommended for my favourite
+      title('movie:8', { genres: [{ id: 80, name: 'Crimen' }] }), // recommended but I already rated it
+      title('movie:9', { genres: [{ id: 35, name: 'Comedia' }], keywords: [50] }), // nothing links it to my taste
+      title('tv:9', { type: 'tv' }),
     ];
-    const discovered = [title('movie:7', { genres: [{ id: 80, name: 'Crimen' }], year: 1997 }), title('tv:9', { type: 'tv' })];
-    const out = pickFeatured({ mine: [{ id: 119, name: 'Prime' }], kind: 'movie', entries, titles, seen: new Set(['movie:1']), discovered });
-    expect(out.map((o) => o.title.key)).toEqual(['movie:2', 'movie:3', 'movie:7', 'movie:1']);
-    expect(out[3].pill).toBe('Ya la has visto · tu nota 9');
-    expect(out[0].pill).toMatch(/^Coincide con \d+ de tus gustos$/);
+    const out = pickFeatured({ mine, kind: 'movie', entries, titles: { 'movie:1': fav }, seen: new Set(['movie:1']), discovered });
+    expect(out.map((o) => o.title.key)).toEqual(['movie:7']);
+    expect(out[0].pill).toBe('Como movie:1 · tu nota 9');
+  });
+  it('never brings back a title I watched, even one I loved, nor one with episodes seen', () => {
+    const fav = title('tv:1', { type: 'tv', genres: [{ id: 80, name: 'Crimen' }], recommendations: ['tv:2', 'tv:3'] });
+    const entries = [entry('tv:1', { myScore: 10, seenAt: 1 }), entry('tv:2', { seenEpisodes: { '1': [1] } })];
+    const discovered = [title('tv:2', { type: 'tv', genres: [{ id: 80, name: 'Crimen' }] }), title('tv:3', { type: 'tv', genres: [{ id: 80, name: 'Crimen' }] })];
+    const out = pickFeatured({ mine, kind: 'tv', entries, titles: { 'tv:1': fav }, seen: new Set(['tv:1']), discovered });
+    expect(out.map((o) => o.title.key)).toEqual(['tv:3']);
+  });
+  it('the more of my favourites lead to a title, the higher it goes; my watchlist gets a push', () => {
+    const a = title('movie:1', { genres: [{ id: 80, name: 'Crimen' }], recommendations: ['movie:20', 'movie:21'] });
+    const b = title('movie:2', { genres: [{ id: 80, name: 'Crimen' }], recommendations: ['movie:20'] });
+    const entries = [entry('movie:1', { myScore: 9, seenAt: 1 }), entry('movie:2', { myScore: 9, seenAt: 1 }), entry('movie:22', { inWatchlist: true })];
+    const crime = [{ id: 80, name: 'Crimen' }];
+    const discovered = [title('movie:21', { genres: crime }), title('movie:20', { genres: crime })];
+    const saved = title('movie:22', { genres: crime, recommendations: [] });
+    const out = pickFeatured({ mine, kind: 'movie', entries, titles: { 'movie:1': a, 'movie:2': b, 'movie:22': { ...saved, keywords: [1] } }, seen: new Set(['movie:1', 'movie:2']), discovered });
+    expect(out.map((o) => o.title.key)[0]).toBe('movie:20');
+  });
+  it('at most two of the five come from the same favourite', () => {
+    const crime = [{ id: 80, name: 'Crimen' }];
+    const fav = title('movie:1', { genres: crime, recommendations: ['movie:30', 'movie:31', 'movie:32', 'movie:33', 'movie:34'] });
+    const discovered = [30, 31, 32, 33, 34].map((n) => title(`movie:${n}`, { genres: crime }));
+    const out = pickFeatured({ mine, kind: 'movie', entries: [entry('movie:1', { myScore: 9, seenAt: 1 })], titles: { 'movie:1': fav }, seen: new Set(['movie:1']), discovered });
+    expect(out).toHaveLength(2);
+  });
+  it('asks TMDB for what my favourites recommend and the themes they share', () => {
+    const f1 = title('movie:1', { keywords: [5, 6, 7], recommendations: ['movie:20', 'movie:21'] });
+    const f2 = title('movie:2', { keywords: [5, 6, 9], recommendations: ['movie:20'] });
+    const profile = buildKindProfile('movie', [entry('movie:1', { myScore: 9 }), entry('movie:2', { myScore: 8 })], { 'movie:1': f1, 'movie:2': f2 });
+    expect(topKeywords(profile)).toEqual([5, 6]);
+    expect(recommendedKeys(profile, new Set(['movie:21']))).toEqual(['movie:20']);
   });
   it('without a profile it offers the best IMDb of the discoveries and asks for tastes', () => {
     const discovered = [title('movie:7', { ratings: { imdb: 6, rt: null, fetchedAt: 1 } }), title('movie:8', { ratings: { imdb: 8.5, rt: null, fetchedAt: 1 } })];
@@ -118,28 +184,12 @@ describe('featured (D28: movies / series)', () => {
     expect(out[0].pill).toBe('Dime tus gustos para afinar');
     expect(pickFeatured({ mine: [{ id: 119, name: 'Prime' }], kind: 'movie', entries: [], titles: {}, seen: new Set(), discovered: [] })).toEqual([]);
   });
-  it('may offer a title I saw and rated 8 or more, saying so, at most two and never a weak one', () => {
-    const entries = [
-      entry('movie:1', { myScore: 9, seenAt: 1 }),
-      entry('movie:2', { myScore: 8, seenAt: 1 }),
-      entry('movie:3', { myScore: 8, seenAt: 1 }),
-      entry('movie:4', { myScore: 5, seenAt: 1 }),
-    ];
-    const t = { ...titles, 'movie:4': title('movie:4') };
-    const discovered = Array.from({ length: 6 }, (_, i) => title(`movie:${60 + i}`, { genres: [{ id: 80, name: 'Crimen' }] }));
-    const out = pickFeatured({ mine: [{ id: 119, name: 'Prime' }], kind: 'movie', entries, titles: t, seen: new Set(['movie:1', 'movie:2', 'movie:3', 'movie:4']), discovered });
-    expect(out).toHaveLength(5);
-    const again = out.filter((o) => o.pill.startsWith('Ya la has visto'));
-    expect(again.map((o) => o.title.key)).toEqual(['movie:1', 'movie:2']);
-    expect(again[0].pill).toBe('Ya la has visto · tu nota 9');
-    expect(out.some((o) => o.title.key === 'movie:4')).toBe(false);
-  });
-  it('never offers a title that is not on my platforms, seen or not', () => {
-    const elsewhere = title('movie:70', { providers: [{ id: 999, name: 'Otra' }] });
-    const entries = [entry('movie:70', { inWatchlist: true }), entry('movie:71', { myScore: 10, seenAt: 1 })];
-    const t = { ...titles, 'movie:70': elsewhere, 'movie:71': title('movie:71', { providers: [] }), 'movie:1': titles['movie:1'] };
-    const out = pickFeatured({ mine: [{ id: 119, name: 'Prime' }], kind: 'movie', entries: [...entries, entry('movie:1', { myScore: 9, seenAt: 1 })], titles: t, seen: new Set(['movie:71', 'movie:1']), discovered: [elsewhere, title('movie:72')] });
-    expect(out.map((o) => o.title.key).sort()).toEqual(['movie:1', 'movie:72']);
+  it('never offers a title that is not on my platforms', () => {
+    const crime = [{ id: 80, name: 'Crimen' }];
+    const fav = title('movie:1', { genres: crime, recommendations: ['movie:70', 'movie:72'] });
+    const elsewhere = title('movie:70', { genres: crime, providers: [{ id: 999, name: 'Otra' }] });
+    const out = pickFeatured({ mine, kind: 'movie', entries: [entry('movie:1', { myScore: 9, seenAt: 1 })], titles: { 'movie:1': fav }, seen: new Set(['movie:1']), discovered: [elsewhere, title('movie:72', { genres: crime })] });
+    expect(out.map((o) => o.title.key)).toEqual(['movie:72']);
   });
   it('gives at most five', () => {
     const many = Array.from({ length: 9 }, (_, i) => title(`movie:${50 + i}`));

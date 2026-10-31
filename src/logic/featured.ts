@@ -1,5 +1,5 @@
 import { myProviders } from './platform';
-import { pairScore, type Ref } from './similar';
+import { buildPool, plotScore, type PlotPool, type Ref } from './similar';
 import type { LibraryEntry, Provider, Title } from '../store/types';
 
 // Featured title on Home, by kind (movies / series) — spec §7.2 reworked (D28). Pure: the caller loads the data.
@@ -20,13 +20,11 @@ export interface Profile {
 }
 
 const MAX_CANDIDATES = 5;
-/** A title I have seen can be offered again from this score up (D28). */
-export const REWATCH_SCORE = 8;
-/** How many of the five may be ones I have already seen. */
-const MAX_REWATCH = 2;
+/** At most this many of the five may come from the same title of mine (D35). */
+const MAX_PER_SOURCE = 2;
 
 function profileFromEntries(chosen: LibraryEntry[], titles: Record<string, Title>): Profile {
-  const refs: Ref[] = chosen.filter((e) => titles[e.key]).map((e) => ({ title: titles[e.key], tagIds: e.tagIds }));
+  const refs: Ref[] = [...chosen].sort((a, b) => (b.myScore ?? 0) - (a.myScore ?? 0)).filter((e) => titles[e.key]).map((e) => ({ title: titles[e.key], tagIds: e.tagIds }));
   const genreCount = new Map<number, number>();
   const decades = new Set<number>();
   let movies = 0;
@@ -54,42 +52,74 @@ export interface FeaturedItem {
   pill: string;
 }
 
-/** Mean pair score of a title against the whole profile (0 when the profile is empty). */
-export const profileAffinity = (profile: Profile, title: Title, tagIds: string[] = []): number =>
-  profile.refs.length === 0 ? 0 : affinityTo(profile, title, tagIds).score;
+/** How much a title I rated pulls: 7 is a nudge, 10 is the whole weight. */
+const weightOf = (score: number | null): number => Math.max(0.25, ((score ?? 7) - 6) / 4);
 
-/** Mean pair score against the whole profile, and how many tags/genres/decade they share (the pill's N). */
-function affinityTo(profile: Profile, title: Title, tagIds: string[]): { score: number; shared: number } {
-  const c: Ref = { title, tagIds };
-  let total = 0;
-  const sharedTags = new Set<string>();
-  for (const ref of profile.refs) {
-    total += pairScore(c, ref, false).score;
-    tagIds.filter((t) => ref.tagIds.includes(t)).forEach((t) => sharedTags.add(t));
-  }
-  const genres = title.genres.filter((g) => profile.topGenres.includes(g.id)).length;
-  const decade = title.year && profile.decades.includes(Math.floor(title.year / 10)) ? 1 : 0;
-  return { score: total / Math.max(1, profile.refs.length), shared: sharedTags.size + genres + decade };
+interface Taste {
+  score: number;
+  /** the title of mine that explains it best */
+  source: Ref | null;
 }
+
+/**
+ * How well a title fits my taste (D35): for each title I rated 7 or more, its plot score against the candidate
+ * (TMDB recommendation, rare shared themes, synopsis), weighted by my score. Several of my favourites pointing at
+ * the same title add up. Zero when no favourite of mine links to it.
+ */
+function tasteOf(profile: Profile, entryScores: Record<string, number | null>, title: Title, tagIds: string[], pool: PlotPool): Taste {
+  const c: Ref = { title, tagIds };
+  let score = 0;
+  let best = 0;
+  let source: Ref | null = null;
+  for (const ref of profile.refs) {
+    const r = plotScore(c, ref, ref.title.recommendations.includes(title.key), ref.title.similar.includes(title.key), pool);
+    if (!r.linked) continue;
+    const part = weightOf(entryScores[ref.title.key] ?? null) * Math.max(0, r.score);
+    score += part;
+    if (part > best) {
+      best = part;
+      source = ref;
+    }
+  }
+  return { score, source };
+}
+
+/** Mean taste score of a title against the whole profile (0 when the profile is empty). */
+export const profileAffinity = (profile: Profile, title: Title, tagIds: string[] = []): number => {
+  if (profile.refs.length === 0) return 0;
+  const pool = buildPool([title, ...profile.refs.map((r) => r.title)]);
+  const total = profile.refs.reduce((sum, ref) => {
+    const r = plotScore({ title, tagIds }, ref, false, false, pool);
+    return sum + (r.linked ? r.score : 0);
+  }, 0);
+  return total / profile.refs.length;
+};
 
 export interface FeaturedInput {
   kind: Kind;
   entries: LibraryEntry[];
   titles: Record<string, Title>;
   seen: ReadonlySet<string>;
-  /** `discover` results on my platforms already loaded */
+  /** candidates already loaded: what my favourites lead to, and `discover` results on my platforms */
   discovered: Title[];
   /** my platforms: nothing that is not on one of them is ever offered */
   mine: Provider[];
 }
 
-/** Up to 5 candidates: my watchlist first, then discoveries on my platforms; empty = show the empty state. */
+/**
+ * Up to 5 candidates, never one I have already watched or rated (D35): TMDB recommendations of my favourites and
+ * discoveries by plot, scored against everything I rated 7 or more; titles on my watchlist get a push.
+ * Empty = show the empty state.
+ */
 export function pickFeatured(input: FeaturedInput): FeaturedItem[] {
   const { kind, entries, seen, discovered, mine } = input;
   const onMine = (t: Title | undefined): t is Title => !!t && myProviders(t, mine).length > 0;
   const titles = Object.fromEntries(Object.entries(input.titles).filter(([, t]) => onMine(t)));
-  const profile = buildKindProfile(kind, entries, titles);
-  const ofKind = discovered.filter((t) => onMine(t) && t.type === kind && !seen.has(t.key));
+  const profile = buildKindProfile(kind, entries, input.titles);
+  // watched or rated = already answered, whatever TMDB thinks
+  const answered = new Set<string>(seen);
+  for (const e of entries) if (e.seenAt !== null || e.myScore !== null || Object.keys(e.seenEpisodes).length > 0) answered.add(e.key);
+  const ofKind = discovered.filter((t) => onMine(t) && t.type === kind && !answered.has(t.key));
 
   if (profile.refs.length === 0) {
     // No taste yet: the best IMDb among recent discoveries.
@@ -97,31 +127,57 @@ export function pickFeatured(input: FeaturedInput): FeaturedItem[] {
     return best.slice(0, MAX_CANDIDATES).map((title) => ({ title, pill: 'Dime tus gustos para afinar' }));
   }
 
-  const watchlist = entries.filter((e) => e.type === kind && e.inWatchlist && titles[e.key] && !seen.has(e.key));
-  const taken = new Set<string>();
-  const out: FeaturedItem[] = [];
-  const add = (candidates: { title: Title; tagIds: string[] }[]) => {
-    const ranked = candidates
-      .map((c) => ({ ...c, ...affinityTo(profile, c.title, c.tagIds) }))
-      .sort((x, y) => y.score - x.score || (y.title.ratings.imdb ?? 0) - (x.title.ratings.imdb ?? 0));
-    for (const c of ranked) {
-      if (out.length >= MAX_CANDIDATES) return;
-      if (taken.has(c.title.key)) continue;
-      taken.add(c.title.key);
-      out.push({ title: c.title, pill: `Coincide con ${c.shared} de tus gustos` });
-    }
-  };
-  add(watchlist.map((e) => ({ title: titles[e.key], tagIds: e.tagIds })));
-  add(ofKind.map((title) => ({ title, tagIds: [] as string[] })));
+  const byKey = Object.fromEntries(entries.map((e) => [e.key, e]));
+  const scores = Object.fromEntries(entries.map((e) => [e.key, e.myScore]));
+  const watchlist = entries.filter((e) => e.type === kind && e.inWatchlist && titles[e.key] && !answered.has(e.key)).map((e) => titles[e.key]);
+  const pool = buildPool([...profile.refs.map((r) => r.title), ...watchlist, ...ofKind]);
+  const candidates = new Map<string, Title>();
+  for (const t of [...watchlist, ...ofKind]) if (!candidates.has(t.key)) candidates.set(t.key, t);
 
-  // Titles I have seen and rated well may come back, saying so; never more than MAX_REWATCH of the five.
-  const again = entries
-    .filter((e) => e.type === kind && seen.has(e.key) && (e.myScore ?? 0) >= REWATCH_SCORE && titles[e.key])
-    .sort((x, y) => (y.myScore ?? 0) - (x.myScore ?? 0))
-    .map((e) => ({ title: titles[e.key], pill: `Ya la has visto · tu nota ${e.myScore}` }));
-  const room = Math.min(MAX_REWATCH, again.length);
-  const fresh = out.slice(0, MAX_CANDIDATES - room);
-  return [...fresh, ...again.slice(0, room), ...out.slice(fresh.length)].slice(0, MAX_CANDIDATES);
+  const ranked = [...candidates.values()]
+    .map((title) => {
+      const tagIds = byKey[title.key]?.tagIds ?? [];
+      const taste = tasteOf(profile, scores, title, tagIds, pool);
+      const push = byKey[title.key]?.inWatchlist ? 5 : 0;
+      return { title, ...taste, total: taste.score > 0 ? taste.score + push : 0 };
+    })
+    .filter((c) => c.total > 0)
+    .sort((x, y) => y.total - x.total || (y.title.ratings.imdb ?? 0) - (x.title.ratings.imdb ?? 0));
+
+  const out: FeaturedItem[] = [];
+  const perSource = new Map<string, number>();
+  for (const c of ranked) {
+    if (out.length >= MAX_CANDIDATES) break;
+    const from = c.source?.title.key ?? '';
+    if ((perSource.get(from) ?? 0) >= MAX_PER_SOURCE) continue;
+    perSource.set(from, (perSource.get(from) ?? 0) + 1);
+    const mark = scores[from];
+    out.push({ title: c.title, pill: c.source ? `Como ${c.source.title.title}${mark ? ` · tu nota ${mark}` : ''}` : 'Encaja con tus gustos' });
+  }
+  return out;
+}
+
+/** The themes my favourites share most: the plot-level way to ask TMDB for more of the same. */
+export function topKeywords(profile: Profile, max = 5): number[] {
+  const count = new Map<number, number>();
+  for (const { title } of profile.refs) for (const k of title.keywords) count.set(k, (count.get(k) ?? 0) + 1);
+  return [...count.entries()]
+    .filter(([, n]) => n >= Math.min(2, profile.refs.length))
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, max)
+    .map(([k]) => k);
+}
+
+/** Candidates that my favourites lead to: what TMDB recommends for the ones I rated best, most-recommended first. */
+export function recommendedKeys(profile: Profile, exclude: ReadonlySet<string>, max = 40): string[] {
+  const count = new Map<string, number>();
+  const favourites = [...profile.refs].slice(0, 12);
+  for (const { title } of favourites) {
+    for (const k of [...title.recommendations.slice(0, 10), ...title.similar.slice(0, 4)]) {
+      if (!exclude.has(k)) count.set(k, (count.get(k) ?? 0) + 1);
+    }
+  }
+  return [...count.entries()].sort((a, b) => b[1] - a[1]).slice(0, max).map(([k]) => k);
 }
 
 export const discoverParamsFor = (profile: Profile, mine: Provider[]): Record<string, string | number> => {
@@ -143,3 +199,13 @@ export const discoverParamsFor = (profile: Profile, mine: Provider[]): Record<st
   }
   return params;
 };
+
+/** Discover by plot: titles on my platforms that carry some of the given TMDB keywords. */
+export const discoverByKeywords = (keywords: number[], mine: Provider[]): Record<string, string | number> => ({
+  watch_region: 'ES',
+  with_watch_monetization_types: 'flatrate',
+  with_watch_providers: mine.map((p) => p.id).join('|'),
+  'vote_count.gte': 150,
+  sort_by: 'vote_average.desc',
+  with_keywords: keywords.join('|'),
+});

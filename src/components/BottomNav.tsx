@@ -29,6 +29,7 @@ function isStandalone(): boolean {
 // Safari's toolbar were still there, so `bottom` lands too high. Anchor to the screen instead.
 function useBottomOffset(): number | null {
   const [offset, setOffset] = useState<number | null>(null);
+  const { pathname } = useLocation();
   useEffect(() => {
     if (!isStandalone()) return;
     const update = () => {
@@ -37,9 +38,21 @@ function useBottomOffset(): number | null {
       setOffset(Math.max(MIN_GAP, EDGE_GAP - missing));
     };
     update();
+    // iOS settles the viewport a moment after the app opens or a screen changes: measure again until it does (D36)
+    const timers = [120, 400, 1000, 2500].map((ms) => window.setTimeout(update, ms));
+    const onShow = () => document.visibilityState === 'visible' && update();
     window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
-  }, []);
+    window.addEventListener('pageshow', update);
+    document.addEventListener('visibilitychange', onShow);
+    window.visualViewport?.addEventListener('resize', update);
+    return () => {
+      timers.forEach((t) => window.clearTimeout(t));
+      window.removeEventListener('resize', update);
+      window.removeEventListener('pageshow', update);
+      document.removeEventListener('visibilitychange', onShow);
+      window.visualViewport?.removeEventListener('resize', update);
+    };
+  }, [pathname]);
   return offset;
 }
 
