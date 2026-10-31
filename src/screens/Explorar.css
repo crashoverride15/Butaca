@@ -139,6 +139,12 @@
   gap: 6px;
 }
 
+.filters__animation {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr 1.4fr;
+  gap: 6px;
+}
+
 .epoch-btn {
   height: 34px;
   border-radius: 10px;

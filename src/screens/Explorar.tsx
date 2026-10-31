@@ -5,7 +5,7 @@ import { LazyTile } from '../components/LazyTile';
 import { Segmented } from '../components/Segmented';
 import { titleToCard } from '../logic/cards';
 import {
-  discoverParams, filterCards, genreSetsForTags, loadFilters, localOnlyTags, orderByAffinity, orderByArrival,
+  ANIMATION_GENRE, discoverParams, filterCards, genreSetsForTags, loadFilters, localOnlyTags, orderByAffinity, orderByArrival,
   profileOf, saveFilters, type ExploreFilters, type Order,
 } from '../logic/explore';
 import { watchStatus, todayIso } from '../logic/status';
@@ -53,7 +53,10 @@ export function Explorar() {
 
   const genreNames = useMemo(() => Object.fromEntries(genres.map((g) => [g.id, g.name])), [genres]);
   const chosenTags = useMemo(() => tags.filter((t) => filters.tagIds.includes(t.id)), [tags, filters.tagIds]);
-  const genreSets = useMemo(() => genreSetsForTags(chosenTags, genres, filters.type), [chosenTags, genres, filters.type]);
+  const genreSets = useMemo(() => {
+    const sets = genreSetsForTags(chosenTags, genres, filters.type);
+    return filters.animation === 'only' ? [...sets, [ANIMATION_GENRE]] : sets;
+  }, [chosenTags, genres, filters.type, filters.animation]);
   const localTags = useMemo(() => localOnlyTags(chosenTags, genres, filters.type), [chosenTags, genres, filters.type]);
 
   const isSeen = useCallback(

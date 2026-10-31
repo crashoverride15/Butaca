@@ -4,7 +4,7 @@ import { Chip } from '../../components/Chip';
 import { Icon } from '../../components/Icon';
 import { Sheet } from '../../components/Sheet';
 import { formatImdb } from '../../logic/format';
-import { activeCount, EPOCHS, type ExploreFilters } from '../../logic/explore';
+import { activeCount, EPOCHS, type Animation, type ExploreFilters } from '../../logic/explore';
 import type { Provider, Tag } from '../../store/types';
 
 // Filters panel — spec §9.3 (item 3).
@@ -15,6 +15,12 @@ interface FiltersPanelProps {
   mine: Provider[];
   tags: Tag[];
 }
+
+const ANIMATION_OPTIONS: { value: Animation; label: string }[] = [
+  { value: 'any', label: 'Todo' },
+  { value: 'no', label: 'Sin animación' },
+  { value: 'only', label: 'Solo animación' },
+];
 
 const toggle = <T,>(list: T[], v: T): T[] => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
 
@@ -71,6 +77,17 @@ export function FiltersPanel({ filters, onChange, mine, tags }: FiltersPanelProp
               {EPOCHS.map((e) => (
                 <button key={e} type="button" aria-pressed={filters.epochs.includes(e)} className={'epoch-btn pressable' + (filters.epochs.includes(e) ? ' is-selected' : '')} onClick={() => set({ epochs: toggle([...filters.epochs], e) })}>
                   {e}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="filters__group">
+            <h3 className="t-eyebrow">ANIMACIÓN</h3>
+            <div className="filters__animation">
+              {ANIMATION_OPTIONS.map((o) => (
+                <button key={o.value} type="button" aria-pressed={filters.animation === o.value} className={'epoch-btn pressable' + (filters.animation === o.value ? ' is-selected' : '')} onClick={() => set({ animation: o.value })}>
+                  <span className="ellipsis">{o.label}</span>
                 </button>
               ))}
             </div>

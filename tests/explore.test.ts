@@ -90,3 +90,19 @@ describe('remembered filters', () => {
     expect(loadFilters(storage)).toEqual(DEFAULT_FILTERS);
   });
 });
+
+describe('animation filter', () => {
+  it('"sin animación" asks TMDB to leave genre 16 out and drops it locally; "solo" asks for it', () => {
+    expect(discoverParams({ ...DEFAULT_FILTERS, animation: 'no' }, mine, []).without_genres).toBe(16);
+    expect(discoverParams(DEFAULT_FILTERS, mine, []).without_genres).toBeUndefined();
+    expect(discoverParams(DEFAULT_FILTERS, mine, [[16]]).with_genres).toBe('16');
+    const cards = [card(1, 2020, [16, 35]), card(2, 2020, [18])];
+    expect(filterCards(cards, { ...DEFAULT_FILTERS, animation: 'no' }, {}, () => false).map((c) => c.tmdbId)).toEqual([2]);
+    expect(filterCards(cards, DEFAULT_FILTERS, {}, () => false)).toHaveLength(2);
+    expect(filterCards(cards, { ...DEFAULT_FILTERS, animation: 'only' }, {}, () => false, [[16]]).map((c) => c.tmdbId)).toEqual([1]);
+  });
+  it('counts as an active filter and is remembered', () => {
+    expect(activeCount({ ...DEFAULT_FILTERS, animation: 'no' })).toBe(1);
+    expect(activeCount(DEFAULT_FILTERS)).toBe(0);
+  });
+});

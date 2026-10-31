@@ -3,8 +3,10 @@
   position: fixed;
   left: 21px;
   right: 21px;
-  /* in Safari */
-  bottom: max(12px, calc(env(safe-area-inset-bottom) - 13px));
+  /* always 8 pt from the bottom edge, in Safari and in the home-screen app: the media query `display-mode: standalone`
+     did not match on the iPhone and the bar fell back to 21 pt. It needs every page to be scrollable (base.css, D37), which
+     makes iOS give the page the whole screen. */
+  bottom: 8px;
   z-index: 10;
   height: 62px;
   padding: 4px;
@@ -73,12 +75,4 @@
 
 .bottom-nav.is-collapsed .bottom-nav__label {
   display: none;
-}
-
-/* Home-screen app: always 8 pt from the bottom edge. It relies on every page being scrollable (base.css, D37), which makes
-   iOS give the page the whole screen; before that the bar sat 58 pt higher on short pages like Inicio. */
-@media (display-mode: standalone) {
-  .bottom-nav {
-    bottom: 8px;
-  }
 }

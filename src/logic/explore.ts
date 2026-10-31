@@ -5,6 +5,9 @@ import type { LibraryEntry, MediaType, Provider, Tag, Title, TitleCard } from '.
 export const EPOCHS = ['80s', '90s', '00s', '10s', '20s'] as const;
 export type Epoch = (typeof EPOCHS)[number];
 export type Order = 'nuevas' | 'nota';
+/** animation: every title, none of it, or only it */
+export type Animation = 'any' | 'no' | 'only';
+export const ANIMATION_GENRE = 16;
 
 export interface ExploreFilters {
   type: MediaType;
@@ -15,6 +18,7 @@ export interface ExploreFilters {
   minImdb: number;
   hideSeen: boolean;
   order: Order;
+  animation: Animation;
 }
 
 export const DEFAULT_FILTERS: ExploreFilters = {
@@ -25,6 +29,7 @@ export const DEFAULT_FILTERS: ExploreFilters = {
   minImdb: 7.0,
   hideSeen: true,
   order: 'nuevas',
+  animation: 'any',
 };
 
 export const FILTERS_KEY = 'butaca.filtros';
@@ -96,6 +101,7 @@ export function discoverParams(
   };
   if (ids.length > 0) params.with_watch_providers = ids.join('|');
   // every tag must hold: with one genre per tag TMDB can do the AND; otherwise it narrows by any and filterCards finishes the job
+  if (f.animation === 'no') params.without_genres = ANIMATION_GENRE;
   if (genreSets.length > 0) params.with_genres = genreSets.every((g) => g.length === 1) ? genreSets.map((g) => g[0]).join(',') : [...new Set(genreSets.flat())].join('|');
   if (f.epochs.length > 0) {
     const starts = f.epochs.map(decadeStart);
@@ -119,7 +125,8 @@ export function activeCount(f: ExploreFilters): number {
     (f.epochs.length > 0 ? 1 : 0) +
     (f.tagIds.length > 0 ? 1 : 0) +
     (f.minImdb !== DEFAULT_FILTERS.minImdb ? 1 : 0) +
-    (f.hideSeen !== DEFAULT_FILTERS.hideSeen ? 1 : 0)
+    (f.hideSeen !== DEFAULT_FILTERS.hideSeen ? 1 : 0) +
+    (f.animation !== DEFAULT_FILTERS.animation ? 1 : 0)
   );
 }
 
@@ -133,6 +140,7 @@ export function filterCards(cards: TitleCard[], f: ExploreFilters, library: Reco
     (c) =>
       yearInEpochs(c.year, f.epochs) &&
       !(f.hideSeen && library[c.key] && isSeen(library[c.key])) &&
+      !(f.animation === 'no' && c.genreIds.includes(ANIMATION_GENRE)) &&
       genreSets.every((set) => set.some((id) => c.genreIds.includes(id))),
   );
 }
