@@ -51,6 +51,7 @@ export async function checkTmdbToken(token: string): Promise<void> {
 
 interface RawResult {
   id: number;
+  name?: string;
 }
 
 interface RawDetail {
@@ -74,12 +75,27 @@ interface RawDetail {
   status?: string;
   number_of_seasons?: number;
   seasons?: { season_number: number; episode_count: number; air_date: string | null }[];
-  last_episode_to_air?: { season_number: number; episode_number: number; air_date: string } | null;
+  last_episode_to_air?: { season_number: number; episode_number: number; air_date: string; runtime?: number | null } | null;
   next_episode_to_air?: { season_number: number; episode_number: number; air_date: string } | null;
   keywords?: { keywords?: RawResult[]; results?: RawResult[] };
   'watch/providers'?: { results?: Record<string, { flatrate?: { provider_id: number; provider_name: string }[] }> };
   recommendations?: { results?: RawResult[] };
   similar?: { results?: RawResult[] };
+  // D39
+  tagline?: string;
+  vote_count?: number;
+  popularity?: number;
+  type?: string;
+  number_of_episodes?: number;
+  episode_run_time?: number[];
+  in_production?: boolean;
+  last_air_date?: string | null;
+  networks?: { name: string }[];
+  created_by?: { name: string }[];
+  content_ratings?: { results?: { iso_3166_1: string; rating: string }[] };
+  release_dates?: { results?: { iso_3166_1: string; release_dates?: { certification?: string }[] }[] };
+  aggregate_credits?: { cast?: { name: string }[] };
+  credits?: { cast?: { name: string }[]; crew?: { name: string; job?: string }[] };
 }
 
 const yearOf = (date?: string): number | null => {
@@ -89,6 +105,20 @@ const yearOf = (date?: string): number | null => {
 
 const episodeRef = (e?: { season_number: number; episode_number: number; air_date: string } | null) =>
   e ? { season: e.season_number, episode: e.episode_number, airDate: e.air_date } : null;
+
+/** Bump it when `mapTitle` starts keeping more: older cached titles are then fetched again the next time they are asked for. */
+export const DETAIL_VERSION = 2;
+
+const MAIN_CAST = 6;
+
+function contentRatingOf(raw: RawDetail): string | null {
+  const tv = raw.content_ratings?.results ?? [];
+  const pick = tv.find((r) => r.iso_3166_1 === 'ES') ?? tv.find((r) => r.iso_3166_1 === 'US');
+  if (pick?.rating) return pick.rating;
+  const movie = raw.release_dates?.results ?? [];
+  const m = movie.find((r) => r.iso_3166_1 === 'ES') ?? movie.find((r) => r.iso_3166_1 === 'US');
+  return m?.release_dates?.find((d) => d.certification)?.certification ?? null;
+}
 
 export function mapTitle(type: MediaType, raw: RawDetail, now = Date.now(), previous?: Title): Title {
   const isTv = type === 'tv';
@@ -116,8 +146,25 @@ export function mapTitle(type: MediaType, raw: RawDetail, now = Date.now(), prev
     ratings: previous?.ratings ?? { imdb: null, rt: null, fetchedAt: null },
     fetchedAt: now,
     providersFetchedAt: now,
+    detailVersion: DETAIL_VERSION,
+    keywordNames: (keywordList ?? []).map((k) => (k.name ?? '').toLowerCase()).filter(Boolean),
+    cast: [
+      ...(isTv ? raw.aggregate_credits?.cast : raw.credits?.cast)?.slice(0, MAIN_CAST).map((c) => c.name) ?? [],
+      ...(isTv ? (raw.created_by ?? []).map((c) => c.name) : (raw.credits?.crew ?? []).filter((c) => c.job === 'Director').map((c) => c.name)),
+    ],
+    tagline: raw.tagline || undefined,
+    contentRating: contentRatingOf(raw),
+    voteCount: raw.vote_count,
+    popularity: raw.popularity,
   };
   if (isTv) {
+    title.tvType = raw.type;
+    title.numberOfEpisodes = raw.number_of_episodes;
+    title.episodeRuntime = raw.episode_run_time?.[0] ?? raw.last_episode_to_air?.runtime ?? null;
+    title.inProduction = raw.in_production;
+    title.lastAirDate = raw.last_air_date ?? null;
+    title.networks = (raw.networks ?? []).map((n) => n.name);
+    title.createdBy = (raw.created_by ?? []).map((c) => c.name);
     title.status = raw.status;
     title.numberOfSeasons = raw.number_of_seasons;
     title.seasons = (raw.seasons ?? [])
@@ -138,10 +185,10 @@ export function mapTitle(type: MediaType, raw: RawDetail, now = Date.now(), prev
 export async function getTitle(type: MediaType, tmdbId: number, opts: { force?: boolean } = {}): Promise<Title> {
   const key = makeKey(type, tmdbId);
   const cached = await getTitleCached(key);
-  if (cached && !opts.force && isFresh(cached.fetchedAt, TITLE_TTL)) return cached;
+  if (cached && !opts.force && isFresh(cached.fetchedAt, TITLE_TTL) && cached.detailVersion === DETAIL_VERSION) return cached;
   try {
     const raw = await tmdbGet<RawDetail>(`/${type}/${tmdbId}`, {
-      append_to_response: 'external_ids,watch/providers,recommendations,similar,keywords',
+      append_to_response: `external_ids,watch/providers,recommendations,similar,keywords,${type === 'tv' ? 'content_ratings,aggregate_credits' : 'release_dates,credits'}`,
     });
     if (!raw.overview?.trim()) {
       // No Spanish synopsis: use the English one (spec §9.2).

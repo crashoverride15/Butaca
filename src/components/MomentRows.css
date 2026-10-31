@@ -1,0 +1,11 @@
+.moment-row__head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.moment-row__hint {
+  font: var(--t-meta);
+  color: var(--muted);
+}

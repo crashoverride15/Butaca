@@ -35,6 +35,27 @@ export interface Title {
   ratings: { imdb: number | null; rt: number | null; fetchedAt: number | null };
   fetchedAt: number;
   providersFetchedAt: number;
+  // More of what TMDB knows (D39). Optional: titles saved before it lack them until they are fetched again.
+  /** which version of the detail this record has (see `DETAIL_VERSION` in api/tmdb.ts) */
+  detailVersion?: number;
+  /** names of the themes in `keywords` (TMDB gives them in English) */
+  keywordNames?: string[];
+  /** main cast, then creators/directors */
+  cast?: string[];
+  tagline?: string;
+  contentRating?: string | null;
+  voteCount?: number;
+  popularity?: number;
+  // series only
+  /** Scripted, Miniseries, Reality, Documentary... */
+  tvType?: string;
+  numberOfEpisodes?: number;
+  /** typical minutes per episode */
+  episodeRuntime?: number | null;
+  inProduction?: boolean;
+  lastAirDate?: string | null;
+  networks?: string[];
+  createdBy?: string[];
 }
 
 export interface LibraryEntry {

@@ -1,9 +1,56 @@
 import { describe, expect, it } from 'vitest';
 import { parseRatings } from '../src/api/omdb';
-import { isDefaultPlatform, mapTitle, platformColor, shortPlatformName } from '../src/api/tmdb';
+import { DETAIL_VERSION, isDefaultPlatform, mapTitle, platformColor, shortPlatformName } from '../src/api/tmdb';
 import { isFresh } from '../src/store/cache';
 
 const NOW = 1_800_000_000_000;
+
+describe('mapTitle keeps more of what TMDB knows (D39)', () => {
+  it('a series: kind, episodes, runtime, networks, creators, theme names, cast, rating, version', () => {
+    const t = mapTitle(
+      'tv',
+      {
+        id: 1,
+        name: 'Person of Interest',
+        type: 'Scripted',
+        number_of_episodes: 103,
+        number_of_seasons: 5,
+        episode_run_time: [],
+        last_episode_to_air: { season_number: 5, episode_number: 13, air_date: '2016-06-21', runtime: 43 },
+        in_production: false,
+        last_air_date: '2016-06-21',
+        networks: [{ name: 'CBS' }],
+        created_by: [{ name: 'Jonathan Nolan' }],
+        keywords: { results: [{ id: 5, name: 'Surveillance' }, { id: 6, name: 'Artificial Intelligence' }] },
+        aggregate_credits: { cast: [{ name: 'Jim Caviezel' }, { name: 'Michael Emerson' }] },
+        content_ratings: { results: [{ iso_3166_1: 'US', rating: 'TV-14' }] },
+        vote_count: 4000,
+        popularity: 55,
+        tagline: 'Sabían demasiado',
+      },
+      NOW,
+    );
+    expect(t).toMatchObject({
+      detailVersion: DETAIL_VERSION,
+      tvType: 'Scripted',
+      numberOfEpisodes: 103,
+      episodeRuntime: 43,
+      inProduction: false,
+      networks: ['CBS'],
+      createdBy: ['Jonathan Nolan'],
+      keywordNames: ['surveillance', 'artificial intelligence'],
+      cast: ['Jim Caviezel', 'Michael Emerson', 'Jonathan Nolan'],
+      contentRating: 'TV-14',
+      voteCount: 4000,
+      tagline: 'Sabían demasiado',
+    });
+  });
+  it('a movie: director after the cast and the age rating of the release', () => {
+    const t = mapTitle('movie', { id: 2, title: 'Heat', credits: { cast: [{ name: 'Al Pacino' }], crew: [{ name: 'Michael Mann', job: 'Director' }, { name: 'X', job: 'Editor' }] }, release_dates: { results: [{ iso_3166_1: 'US', release_dates: [{ certification: 'R' }] }] } }, NOW);
+    expect(t.cast).toEqual(['Al Pacino', 'Michael Mann']);
+    expect(t.contentRating).toBe('R');
+  });
+});
 
 describe('mapTitle', () => {
   it('maps a movie: Spanish title, year, runtime, countries, ES flatrate providers only', () => {

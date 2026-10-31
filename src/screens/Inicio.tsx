@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { HeroCard } from '../components/HeroCard';
 import { ContinueCard } from '../components/ContinueCard';
+import { MomentRows } from '../components/MomentRows';
 import { LazyTile } from '../components/LazyTile';
 import { Segmented } from '../components/Segmented';
 import { useToast } from '../components/Toast';
@@ -152,6 +153,7 @@ export function Inicio() {
           )}
         </div>
 
+        {kind === 'tv' && <MomentRows />}
         <ContinueSection />
         <NoveltiesSection kind={kind} />
       </main>

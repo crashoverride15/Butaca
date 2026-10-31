@@ -14,7 +14,7 @@ import type { LibraryEntry, Provider, Title } from '../store/types';
 const MAX_DETAIL_LOADS = 40;
 
 /** Details of these keys: cache first, then TMDB for at most `max` of the missing ones. */
-async function loadTitles(keys: string[], max: number): Promise<Title[]> {
+export async function loadTitles(keys: string[], max: number): Promise<Title[]> {
   const out: Title[] = [];
   const missing: string[] = [];
   for (const key of keys) {
@@ -32,7 +32,7 @@ async function loadTitles(keys: string[], max: number): Promise<Title[]> {
 }
 
 /** With a taste: what TMDB recommends for my favourites, plus titles that carry their themes (D35). */
-async function tasteCandidates(kind: Kind, profile: ReturnType<typeof buildKindProfile>, entries: LibraryEntry[], mine: Provider[]): Promise<Title[]> {
+export async function tasteCandidates(kind: Kind, profile: ReturnType<typeof buildKindProfile>, entries: LibraryEntry[], mine: Provider[], maxLoads = MAX_DETAIL_LOADS): Promise<Title[]> {
   const answered = new Set(entries.filter((e) => e.seenAt !== null || e.myScore !== null).map((e) => e.key));
   const keywords = topKeywords(profile);
   const [byPlot, byGenre] = await Promise.all([
@@ -43,7 +43,7 @@ async function tasteCandidates(kind: Kind, profile: ReturnType<typeof buildKindP
     ...recommendedKeys(profile, answered),
     ...[...(byPlot?.items ?? []), ...(byGenre?.items ?? [])].slice(0, 20).map((c) => c.key),
   ].filter((k) => !answered.has(k));
-  return loadTitles([...new Set(keys)], MAX_DETAIL_LOADS);
+  return loadTitles([...new Set(keys)], maxLoads);
 }
 
 /** Without a taste yet: the best of what arrived in the last years, with IMDb to order them. */

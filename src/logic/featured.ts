@@ -106,26 +106,27 @@ export interface FeaturedInput {
   mine: Provider[];
 }
 
+export interface Ranked {
+  title: Title;
+  total: number;
+  /** the title of mine that explains it best */
+  source: Ref | null;
+}
+
 /**
- * Up to 5 candidates, never one I have already watched or rated (D35): TMDB recommendations of my favourites and
- * discoveries by plot, scored against everything I rated 7 or more; titles on my watchlist get a push.
- * Empty = show the empty state.
+ * Candidates ranked by how well they fit my taste (D35), never one I have already watched or rated and only on my
+ * platforms. `null` when there is no taste yet (nothing rated 7 or more).
  */
-export function pickFeatured(input: FeaturedInput): FeaturedItem[] {
+export function rankByTaste(input: FeaturedInput): { ranked: Ranked[]; scores: Record<string, number | null> } | null {
   const { kind, entries, seen, discovered, mine } = input;
   const onMine = (t: Title | undefined): t is Title => !!t && myProviders(t, mine).length > 0;
   const titles = Object.fromEntries(Object.entries(input.titles).filter(([, t]) => onMine(t)));
   const profile = buildKindProfile(kind, entries, input.titles);
+  if (profile.refs.length === 0) return null;
   // watched or rated = already answered, whatever TMDB thinks
   const answered = new Set<string>(seen);
   for (const e of entries) if (e.seenAt !== null || e.myScore !== null || Object.keys(e.seenEpisodes).length > 0) answered.add(e.key);
   const ofKind = discovered.filter((t) => onMine(t) && t.type === kind && !answered.has(t.key));
-
-  if (profile.refs.length === 0) {
-    // No taste yet: the best IMDb among recent discoveries.
-    const best = [...ofKind].sort((a, b) => (b.ratings.imdb ?? 0) - (a.ratings.imdb ?? 0));
-    return best.slice(0, MAX_CANDIDATES).map((title) => ({ title, pill: 'Dime tus gustos para afinar' }));
-  }
 
   const byKey = Object.fromEntries(entries.map((e) => [e.key, e]));
   const scores = Object.fromEntries(entries.map((e) => [e.key, e.myScore]));
@@ -139,11 +140,29 @@ export function pickFeatured(input: FeaturedInput): FeaturedItem[] {
       const tagIds = byKey[title.key]?.tagIds ?? [];
       const taste = tasteOf(profile, scores, title, tagIds, pool);
       const push = byKey[title.key]?.inWatchlist ? 5 : 0;
-      return { title, ...taste, total: taste.score > 0 ? taste.score + push : 0 };
+      return { title, source: taste.source, total: taste.score > 0 ? taste.score + push : 0 };
     })
     .filter((c) => c.total > 0)
     .sort((x, y) => y.total - x.total || (y.title.ratings.imdb ?? 0) - (x.title.ratings.imdb ?? 0));
+  return { ranked, scores };
+}
 
+/**
+ * Up to 5 candidates (D35): the best of `rankByTaste`, at most two from the same favourite of mine.
+ * Without a taste yet, the best IMDb among recent discoveries. Empty = show the empty state.
+ */
+export function pickFeatured(input: FeaturedInput): FeaturedItem[] {
+  const { kind, entries, seen, discovered, mine } = input;
+  const result = rankByTaste(input);
+  if (!result) {
+    const answered = new Set<string>(seen);
+    for (const e of entries) if (e.seenAt !== null || e.myScore !== null || Object.keys(e.seenEpisodes).length > 0) answered.add(e.key);
+    const best = discovered
+      .filter((t) => myProviders(t, mine).length > 0 && t.type === kind && !answered.has(t.key))
+      .sort((a, b) => (b.ratings.imdb ?? 0) - (a.ratings.imdb ?? 0));
+    return best.slice(0, MAX_CANDIDATES).map((title) => ({ title, pill: 'Dime tus gustos para afinar' }));
+  }
+  const { ranked, scores } = result;
   const out: FeaturedItem[] = [];
   const perSource = new Map<string, number>();
   for (const c of ranked) {
