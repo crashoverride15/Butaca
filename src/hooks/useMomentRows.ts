@@ -6,7 +6,7 @@ import { todayIso, watchStatus } from '../logic/status';
 import { getAllEntries } from '../store/library';
 import { useSettings } from '../store/SettingsContext';
 import { getTitleCached } from '../store/titles';
-import type { Title } from '../store/types';
+import type { LibraryEntry, Title } from '../store/types';
 import { tasteCandidates } from './useFeatured';
 
 // The three rows of Inicio → Series (D39): new series on my platforms, by what suits each moment.
@@ -32,6 +32,20 @@ async function enriched(key: string, type: 'tv', tmdbId: number): Promise<Title 
   return getTitle(type, tmdbId).catch(() => cached);
 }
 
+/** My series with a moment: they teach what each moment looks like. */
+export async function loadLabelled(entries: LibraryEntry[]): Promise<LabelledSeries[]> {
+  const labelled: LabelledSeries[] = [];
+  await Promise.all(
+    entries
+      .filter((e) => e.type === 'tv' && e.tagIds.some((t) => (MOMENT_IDS as readonly string[]).includes(t)))
+      .map(async (e) => {
+        const t = await enriched(e.key, 'tv', Number(e.key.split(':')[1]));
+        if (t) labelled.push({ title: t, moments: e.tagIds.filter((id) => id.startsWith('momento:')) });
+      }),
+  );
+  return labelled;
+}
+
 export function useMomentRows(): MomentRow[] | null {
   const { settings } = useSettings();
   const [rows, setRows] = useState<MomentRow[] | null>(null);
@@ -55,16 +69,7 @@ export function useMomentRows(): MomentRow[] | null {
         const today = todayIso();
         const seen = new Set(entries.filter((e) => titles[e.key] && watchStatus(titles[e.key], e, today) === 'vista').map((e) => e.key));
 
-        // my series with a moment: they teach what each moment looks like
-        const labelled: LabelledSeries[] = [];
-        await Promise.all(
-          entries
-            .filter((e) => e.type === 'tv' && e.tagIds.some((t) => (MOMENT_IDS as readonly string[]).includes(t)))
-            .map(async (e) => {
-              const t = await enriched(e.key, 'tv', Number(e.key.split(':')[1]));
-              if (t) labelled.push({ title: t, moments: e.tagIds.filter((id) => id.startsWith('momento:')) });
-            }),
-        );
+        const labelled = await loadLabelled(entries);
 
         const profile = buildKindProfile('tv', entries, titles);
         if (profile.refs.length === 0 || settings.platforms.length === 0) {

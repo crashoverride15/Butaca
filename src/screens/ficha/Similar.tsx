@@ -7,6 +7,8 @@ import { platformLabel } from '../../logic/platform';
 import { candidateKeys, similarTo, type SimilarItem } from '../../logic/similar';
 import { todayIso, watchStatus } from '../../logic/status';
 import { discoverByKeywords } from '../../logic/featured';
+import { estimateMoment } from '../../logic/seriesMoment';
+import { loadLabelled } from '../../hooks/useMomentRows';
 import { getAllEntries } from '../../store/library';
 import { getTitleCached } from '../../store/titles';
 import type { Provider, Title } from '../../store/types';
@@ -54,7 +56,13 @@ export function Similar({ title, mine }: { title: Title; mine: Provider[] }) {
       const candidates = await loadCandidates(keys);
       const today = todayIso();
       const seen = new Set(candidates.filter((c) => watchStatus(c, library[c.key], today) === 'vista').map((c) => c.key));
-      const result = similarTo({ target: title, targetEntry: library[title.key], candidates, library, seen, mine });
+      // series: the moment of those I have not classified, guessed from the ones I have (D41)
+      const estimated: Record<string, string | null> = {};
+      if (title.type === 'tv') {
+        const labelled = await loadLabelled(entries);
+        for (const t of [title, ...candidates]) estimated[t.key] = estimateMoment(t, labelled).moment;
+      }
+      const result = similarTo({ target: title, targetEntry: library[title.key], candidates, library, seen, mine, estimated });
       if (!alive) return;
       setItems(result);
       for (const item of result) {

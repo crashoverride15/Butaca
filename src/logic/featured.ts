@@ -84,6 +84,21 @@ function tasteOf(profile: Profile, entryScores: Record<string, number | null>, t
   return { score, source };
 }
 
+/** How much a title I rated low pushes away: 4 is a nudge, 1 the whole weight (D41). */
+const dislikeOf = (score: number): number => (5 - score) / 4;
+/** Rated this or lower: I did not like it. */
+export const DISLIKE_MAX = 4;
+
+/** What my low-rated titles (1 to 4) say against a candidate: their plot score, weighted by how low I rated them. */
+function distasteOf(disliked: Ref[], entryScores: Record<string, number | null>, title: Title, pool: PlotPool): number {
+  let score = 0;
+  for (const ref of disliked) {
+    const r = plotScore({ title, tagIds: [] }, ref, ref.title.recommendations.includes(title.key), ref.title.similar.includes(title.key), pool);
+    if (r.linked) score += dislikeOf(entryScores[ref.title.key] ?? DISLIKE_MAX) * Math.max(0, r.score);
+  }
+  return score;
+}
+
 /** Mean taste score of a title against the whole profile (0 when the profile is empty). */
 export const profileAffinity = (profile: Profile, title: Title, tagIds: string[] = []): number => {
   if (profile.refs.length === 0) return 0;
@@ -117,7 +132,7 @@ export interface Ranked {
 }
 
 /**
- * Candidates ranked by how well they fit my taste (D35), never one I have already watched or rated and only on my
+ * Candidates ranked by how well they fit my taste (D35), less what is like the titles I rated 1 to 4 (D41), never one I have already watched or rated and only on my
  * platforms. `null` when there is no taste yet (nothing rated 7 or more).
  */
 export function rankByTaste(input: FeaturedInput): { ranked: Ranked[]; scores: Record<string, number | null> } | null {
@@ -135,7 +150,10 @@ export function rankByTaste(input: FeaturedInput): { ranked: Ranked[]; scores: R
   const byKey = Object.fromEntries(entries.map((e) => [e.key, e]));
   const scores = Object.fromEntries(entries.map((e) => [e.key, e.myScore]));
   const watchlist = entries.filter((e) => e.type === kind && e.inWatchlist && titles[e.key] && !answered.has(e.key)).map((e) => titles[e.key]);
-  const pool = buildPool([...profile.refs.map((r) => r.title), ...watchlist, ...ofKind]);
+  const disliked: Ref[] = entries
+    .filter((e) => e.type === kind && e.myScore !== null && e.myScore <= DISLIKE_MAX && input.titles[e.key])
+    .map((e) => ({ title: input.titles[e.key], tagIds: e.tagIds }));
+  const pool = buildPool([...profile.refs.map((r) => r.title), ...disliked.map((r) => r.title), ...watchlist, ...ofKind]);
   const candidates = new Map<string, Title>();
   for (const t of [...watchlist, ...ofKind]) if (!candidates.has(t.key)) candidates.set(t.key, t);
 
@@ -144,7 +162,8 @@ export function rankByTaste(input: FeaturedInput): { ranked: Ranked[]; scores: R
       const tagIds = byKey[title.key]?.tagIds ?? [];
       const taste = tasteOf(profile, scores, title, tagIds, pool);
       const push = byKey[title.key]?.inWatchlist ? 5 : 0;
-      return { title, source: taste.source, total: taste.score > 0 ? taste.score + push : 0 };
+      const against = distasteOf(disliked, scores, title, pool);
+      return { title, source: taste.source, total: taste.score > 0 ? taste.score + push - against : 0 };
     })
     .filter((c) => c.total > 0)
     .sort((x, y) => y.total - x.total || (y.title.ratings.imdb ?? 0) - (x.title.ratings.imdb ?? 0));

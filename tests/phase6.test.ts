@@ -97,6 +97,20 @@ describe('similar (spec §7.1)', () => {
     const out = similarTo({ target: t, targetEntry: lib['tv:1'], candidates: [random, weekday, untagged], library: lib, seen: new Set(), mine });
     expect(out.map((i) => i.title.key)).toEqual(['tv:3', 'tv:4']);
   });
+  it('uses the estimated moment of series I have not classified (D41): a sure clash is out, a guessed one goes last', () => {
+    const crime = [{ id: 80, name: 'Crimen' }];
+    const t = title('tv:1', { type: 'tv', genres: crime, keywords: [1, 2, 3], recommendations: ['tv:2', 'tv:3', 'tv:4'] });
+    const sleepy = title('tv:2', { type: 'tv', genres: crime, keywords: [1, 2, 3] });
+    const marathon = title('tv:3', { type: 'tv', genres: crime, keywords: [1, 2] });
+    const unknown = title('tv:4', { type: 'tv', genres: crime, keywords: [1, 2] });
+    const lib = { 'tv:1': entry('tv:1', { tagIds: ['momento:maraton'] }) } as Record<string, LibraryEntry>;
+    const estimated = { 'tv:2': 'momento:para-dormirme', 'tv:3': 'momento:maraton' };
+    const out = similarTo({ target: t, targetEntry: lib['tv:1'], candidates: [sleepy, marathon, unknown], library: lib, seen: new Set(), mine, estimated });
+    expect(out.map((i) => i.title.key)).toEqual(['tv:3', 'tv:4', 'tv:2']);
+    // the target itself guessed: still a guess, so nothing is hidden
+    const guessed = similarTo({ target: t, candidates: [sleepy, marathon], library: {}, seen: new Set(), mine, estimated: { ...estimated, 'tv:1': 'momento:maraton' } });
+    expect(guessed.map((i) => i.title.key)).toEqual(['tv:3', 'tv:2']);
+  });
   it('moment match only disagrees when both have a moment tag', () => {
     expect(momentMatch(['momento:random'], ['momento:entre-semana'])).toBe('different');
     expect(momentMatch(['momento:random', 'estilo:thriller'], ['momento:random'])).toBe('same');
@@ -126,6 +140,18 @@ describe('featured (D28, D35: movies / series, by taste)', () => {
   it('has one eyebrow per kind', () => {
     expect(EYEBROW.movie).toBe('PELÍCULA PARA TI');
     expect(EYEBROW.tv).toBe('SERIE PARA TI');
+  });
+  it('what I rated 1 to 4 pushes away what is like it (D41)', () => {
+    const crime = [{ id: 80, name: 'Crimen' }];
+    const fav = title('movie:1', { genres: crime, keywords: [1, 2, 3], recommendations: ['movie:7', 'movie:8'] });
+    const bad = title('movie:9', { genres: crime, keywords: [20, 21, 22, 23], recommendations: ['movie:8'] });
+    const entries = [entry('movie:1', { myScore: 9, seenAt: 1 }), entry('movie:9', { myScore: 2, seenAt: 1 })];
+    const like = title('movie:7', { genres: crime, keywords: [1, 2] });
+    const both = title('movie:8', { genres: crime, keywords: [1, 2, 20, 21, 22, 23] });
+    const input = { kind: 'movie' as const, entries, titles: { 'movie:1': fav, 'movie:9': bad }, seen: new Set<string>(), discovered: [both, like], mine };
+    expect(pickFeatured(input).map((i) => i.title.key)).toEqual(['movie:7']);
+    const neutral = { ...input, entries: [entries[0], entry('movie:9', { myScore: 6, seenAt: 1 })] };
+    expect(pickFeatured(neutral).map((i) => i.title.key)).toEqual(['movie:8', 'movie:7']);
   });
   it('builds the profile from titles of that kind rated 7 or more', () => {
     const entries = [entry('movie:1', { myScore: 9 }), entry('movie:3', { myScore: 3 }), entry('tv:5', { type: 'tv', myScore: 10 })];

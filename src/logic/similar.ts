@@ -23,6 +23,8 @@ export interface SimilarInput {
   /** keys I have watched (movies seen, series with every aired episode seen) */
   seen: ReadonlySet<string>;
   mine: Provider[];
+  /** the moment guessed for series I have not classified, by key (D41); my own tags always win */
+  estimated?: Record<string, string | null | undefined>;
 }
 
 const ANIMATION = 16;
@@ -116,6 +118,8 @@ export function momentMatch(candidateTags: string[], targetTags: string[]): 'sam
   return mc.some((x) => mt.includes(x)) ? 'same' : 'different';
 }
 
+const hasMoment = (ids: string[]): boolean => ids.some((i) => i.startsWith('momento:'));
+
 export const plotCaption = (recommended: boolean, sharedKeywords: number): string =>
   recommended ? 'Recomendada por TMDB' : sharedKeywords >= 2 ? `${sharedKeywords} temas en común` : 'Parecida en la trama';
 
@@ -128,6 +132,10 @@ export function similarTo(input: SimilarInput, limit = 12): SimilarItem[] {
   const similar = new Set(target.similar);
   const pool = buildPool([target, ...input.candidates]);
   const done = new Set<string>([target.key]);
+  const withGuess = (key: string, tags: string[]): string[] => {
+    const guess = input.estimated?.[key];
+    return hasMoment(tags) || !guess ? tags : [...tags, guess];
+  };
 
   const items: (SimilarItem & { imdb: number })[] = [];
   for (const c of input.candidates) {
@@ -136,13 +144,16 @@ export function similarTo(input: SimilarInput, limit = 12): SimilarItem[] {
     if (seen.has(c.key)) continue;
     if (!c.providers.some((p) => mineIds.has(p.id))) continue;
     const tags = library[c.key]?.tagIds ?? [];
-    const moment = momentMatch(tags, tRef.tagIds);
-    if (moment === 'different') continue;
+    const moment = momentMatch(withGuess(c.key, tags), withGuess(target.key, tRef.tagIds));
+    // both classified by me and different: out; a guess involved: it only goes last
+    const sure = hasMoment(tags) && hasMoment(tRef.tagIds);
+    if (moment === 'different' && sure) continue;
 
     const rec = recommended.has(c.key);
     const r = plotScore({ title: c, tagIds: tags }, tRef, rec, similar.has(c.key), pool);
     if (!r.linked) continue;
-    items.push({ title: c, score: r.score + (moment === 'same' ? 4 : 0), caption: plotCaption(rec, r.keywords), imdb: c.ratings.imdb ?? 0 });
+    const bonus = moment === 'same' ? 4 : moment === 'different' ? -1000 : 0;
+    items.push({ title: c, score: r.score + bonus, caption: plotCaption(rec, r.keywords), imdb: c.ratings.imdb ?? 0 });
   }
   return items
     .sort((a, b) => b.score - a.score || b.imdb - a.imdb)
