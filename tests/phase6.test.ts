@@ -3,7 +3,7 @@ import { buildKindProfile, EYEBROW, pickFeatured } from '../src/logic/featured';
 import { diffSnapshot, isNew, noveltyDue, recentArrivals, relativeArrival, DAY_MS } from '../src/logic/novelties';
 import { runRefresh, refreshDue, REFRESH_INTERVAL_MS } from '../src/logic/refresh';
 import { isFollowed, seasonAlerts } from '../src/logic/seasons';
-import { candidateKeys, commonCaption, pairScore, similarTo } from '../src/logic/similar';
+import { candidateKeys, commonCaption, pairScore, plotCaption, similarTo } from '../src/logic/similar';
 import { addAlerts, listAlerts, markRead, unreadCount } from '../src/store/alerts';
 import { emptyEntry, getEntry, saveEntry } from '../src/store/library';
 import { getSettings, saveSettings } from '../src/store/settings';
@@ -34,19 +34,39 @@ describe('similar (spec §7.1)', () => {
     const c = title('movie:3', { year: 2003 });
     expect(pairScore({ title: c, tagIds: [] }, { title: target, tagIds: [] }, false).score).toBe(1 + 2);
   });
-  it('drops seen titles and those off my platforms, orders by score then IMDb, and caps at 12', () => {
+  it('drops seen titles, those off my platforms and those with no plot link; orders by score then IMDb; caps at 12', () => {
     const library: Record<string, LibraryEntry> = {};
+    const plot = { genres: [{ id: 80, name: 'Crimen' }], keywords: [1, 2, 3] };
+    const t = { ...target, recommendations: ['movie:3'] };
     const cands = [
-      title('movie:2', { genres: [{ id: 80, name: 'Crimen' }] }),
-      title('movie:3', { genres: [{ id: 80, name: 'Crimen' }, { id: 28, name: 'Acción' }] }),
-      title('movie:4', { providers: [{ id: 8, name: 'Netflix' }], genres: [{ id: 80, name: 'Crimen' }] }),
-      title('movie:5', { genres: [{ id: 80, name: 'Crimen' }] }),
-      title('tv:6', { genres: [{ id: 80, name: 'Crimen' }] }),
+      title('movie:2', plot),
+      title('movie:3', { ...plot, keywords: [] }), // only recommended
+      title('movie:4', { ...plot, providers: [{ id: 8, name: 'Netflix' }] }),
+      title('movie:5', plot),
+      title('movie:6', { genres: [{ id: 80, name: 'Crimen' }, { id: 28, name: 'Acción' }] }), // same genres, no plot link
+      title('tv:7', plot),
     ];
-    const out = similarTo({ target, candidates: cands, library, seen: new Set(['movie:5']), mine });
+    const out = similarTo({ target: t, candidates: cands, library, seen: new Set(['movie:5']), mine });
     expect(out.map((i) => i.title.key)).toEqual(['movie:3', 'movie:2']);
-    const many = Array.from({ length: 30 }, (_, i) => title(`movie:${100 + i}`));
-    expect(similarTo({ target, candidates: many, library, seen: new Set(), mine })).toHaveLength(12);
+    expect(out.map((i) => i.caption)).toEqual(['Recomendada por TMDB', '3 temas en común']);
+    const many = Array.from({ length: 30 }, (_, i) => title(`movie:${100 + i}`, plot));
+    expect(similarTo({ target: t, candidates: many, library, seen: new Set(), mine })).toHaveLength(12);
+  });
+  it('a cartoon does not stand in for a live-action show, even with the same genres and tags (Person of Interest vs Invincible)', () => {
+    const poi = title('tv:1', { type: 'tv', genres: [{ id: 80, name: 'Crimen' }, { id: 18, name: 'Drama' }], keywords: [10, 11, 12, 13], year: 2011 });
+    const invincible = title('tv:2', { type: 'tv', genres: [{ id: 16, name: 'Animación' }, { id: 80, name: 'Crimen' }, { id: 18, name: 'Drama' }], keywords: [10], year: 2021 });
+    const mindhunter = title('tv:3', { type: 'tv', genres: [{ id: 80, name: 'Crimen' }, { id: 18, name: 'Drama' }], keywords: [10, 11, 99], year: 2017 });
+    const lib = { 'tv:1': entry('tv:1', { tagIds: ['estilo:thriller'] }), 'tv:2': entry('tv:2', { tagIds: ['estilo:thriller'] }) } as Record<string, LibraryEntry>;
+    const out = similarTo({ target: poi, targetEntry: lib['tv:1'], candidates: [invincible, mindhunter], library: lib, seen: new Set(), mine });
+    expect(out.map((i) => i.title.key)).toEqual(['tv:3']);
+    // recommended by TMDB but animated: allowed, yet far below a live-action match
+    const rec = similarTo({ target: { ...poi, recommendations: ['tv:2'] }, candidates: [invincible, mindhunter], library: lib, seen: new Set(), mine });
+    expect(rec.map((i) => i.title.key)).toEqual(['tv:3', 'tv:2']);
+  });
+  it('plot captions', () => {
+    expect(plotCaption(true, 0)).toBe('Recomendada por TMDB');
+    expect(plotCaption(false, 3)).toBe('3 temas en común');
+    expect(plotCaption(false, 1)).toBe('Parecida en tema');
   });
   it('captions: shared tags or "Recomendada por TMDB"', () => {
     expect(commonCaption(0)).toBe('Recomendada por TMDB');

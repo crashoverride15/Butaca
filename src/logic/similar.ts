@@ -60,12 +60,44 @@ export interface SimilarInput {
   mine: Provider[];
 }
 
-/** Up to 12 titles like the target: not seen, on my platforms, best score first. */
+const ANIMATION = 16;
+
+/**
+ * "Parecidas" must share the plot, not just the high-level labels (D34): TMDB recommendations and shared keywords
+ * (plot-level themes) lead; genres, tags and decade only break ties. A cartoon never stands in for a live-action show.
+ */
+export function plotScore(c: Ref, t: Ref, recommended: boolean, inSimilar: boolean): { score: number; keywords: number; linked: boolean } {
+  const keywords = c.title.keywords.filter((k) => t.title.keywords.includes(k)).length;
+  const sharedGenres = c.title.genres.filter((g) => t.title.genres.some((x) => x.id === g.id)).length;
+  const sharedTags = c.tagIds.filter((id) => t.tagIds.includes(id)).length;
+  const dc = decadeOf(c.title.year);
+  const sameDecade = dc !== null && dc === decadeOf(t.title.year);
+  const sameCountry = c.title.originCountry.some((x) => t.title.originCountry.includes(x));
+  const animated = (r: Ref) => r.title.genres.some((g) => g.id === ANIMATION);
+  const score =
+    (recommended ? 10 : 0) +
+    (inSimilar ? 3 : 0) +
+    3 * Math.min(keywords, 8) +
+    1.5 * sharedGenres +
+    sharedTags +
+    (sameDecade ? 1 : 0) +
+    (sameCountry ? 1 : 0) +
+    ((c.title.ratings.imdb ?? 0) >= 7.5 ? 1 : 0) -
+    (animated(c) !== animated(t) ? 15 : 0);
+  // a link to the plot is required: TMDB recommends it, or they share themes
+  return { score, keywords, linked: recommended || keywords >= 2 || (inSimilar && keywords >= 1) };
+}
+
+export const plotCaption = (recommended: boolean, keywords: number): string =>
+  recommended ? 'Recomendada por TMDB' : keywords >= 2 ? `${keywords} temas en común` : 'Parecida en tema';
+
+/** Up to 12 titles like the target: not seen, on my platforms, with a plot link, best score first. */
 export function similarTo(input: SimilarInput, limit = 12): SimilarItem[] {
   const { target, targetEntry, library, seen, mine } = input;
   const mineIds = new Set(mine.map((p) => p.id));
   const tRef: Ref = { title: target, tagIds: targetEntry?.tagIds ?? [] };
   const recommended = new Set(target.recommendations);
+  const similar = new Set(target.similar);
   const done = new Set<string>([target.key]);
 
   const items: (SimilarItem & { imdb: number })[] = [];
@@ -74,8 +106,10 @@ export function similarTo(input: SimilarInput, limit = 12): SimilarItem[] {
     done.add(c.key);
     if (seen.has(c.key)) continue;
     if (!c.providers.some((p) => mineIds.has(p.id))) continue;
-    const r = pairScore({ title: c, tagIds: library[c.key]?.tagIds ?? [] }, tRef, recommended.has(c.key));
-    items.push({ title: c, score: r.score, caption: commonCaption(r.common), imdb: c.ratings.imdb ?? 0 });
+    const rec = recommended.has(c.key);
+    const r = plotScore({ title: c, tagIds: library[c.key]?.tagIds ?? [] }, tRef, rec, similar.has(c.key));
+    if (!r.linked) continue;
+    items.push({ title: c, score: r.score, caption: plotCaption(rec, r.keywords), imdb: c.ratings.imdb ?? 0 });
   }
   return items
     .sort((a, b) => b.score - a.score || b.imdb - a.imdb)
