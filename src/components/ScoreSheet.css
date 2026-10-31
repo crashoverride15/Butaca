@@ -1,0 +1,24 @@
+.score-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+
+.score-grid__btn {
+  height: 52px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: 800 20px/1 var(--font-display);
+}
+
+.score-grid__btn.is-selected {
+  background: var(--accent);
+  color: #fff;
+}
+
+.score-clear {
+  min-height: var(--tap);
+  font: 600 14px/1 var(--font-body);
+  color: var(--muted);
+}

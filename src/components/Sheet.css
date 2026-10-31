@@ -1,0 +1,54 @@
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.sheet {
+  position: relative;
+  width: 100%;
+  max-height: 85dvh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 20px calc(20px + env(safe-area-inset-bottom));
+  border-radius: 22px 22px 0 0;
+  background: var(--surface);
+  animation: sheet-up 200ms ease-out;
+}
+
+.sheet__handle {
+  align-self: center;
+  width: 36px;
+  height: 4px;
+  margin-top: -10px;
+  border-radius: 2px;
+  background: var(--line-strong);
+}
+
+.sheet__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.sheet__action {
+  flex: none;
+  min-height: var(--tap);
+  padding: 0 4px;
+  font: 700 14px/1 var(--font-body);
+  color: var(--accent-text);
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+}

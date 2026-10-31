@@ -1,0 +1,18 @@
+.rating-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--overlay-pill);
+  font: 700 11px/1 var(--font-body);
+  white-space: nowrap;
+}
+
+.rating-pill__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--rt);
+}

@@ -1,0 +1,28 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font: 600 13px/1 var(--font-body);
+  white-space: nowrap;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+.chip.is-selected {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 700;
+}
+
+.chip.is-add {
+  background: transparent;
+  border: 1px dashed var(--line-dashed);
+  color: var(--text-soft);
+}

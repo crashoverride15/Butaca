@@ -1,0 +1,152 @@
+/* Reset, base typography and utilities — spec §2, §3, §10. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  background: var(--bg);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: var(--t-body);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overflow-x: hidden;
+  min-height: 100dvh;
+}
+
+button,
+a {
+  color: inherit;
+  font: inherit;
+  background: none;
+  border: none;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+/* iOS zooms the whole page when focusing a field under 16 px and, in a home-screen app, never
+   zooms back out: the page ends up wider than the screen. Every field is at least 16 px. */
+input,
+textarea,
+select {
+  font-size: max(16px, 1em);
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+}
+
+/* §2 Golden rule: one-line text never wraps */
+.nowrap {
+  white-space: nowrap;
+}
+
+.ellipsis {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Typography roles */
+.t-screen {
+  font: var(--t-screen);
+  letter-spacing: var(--t-screen-track);
+}
+
+.t-greeting {
+  font: var(--t-greeting);
+  letter-spacing: var(--t-greeting-track);
+}
+
+.t-section {
+  font: var(--t-section);
+}
+
+.t-eyebrow {
+  font: var(--t-eyebrow);
+  letter-spacing: var(--t-eyebrow-track);
+  text-transform: uppercase;
+}
+
+/* §3 Screen container: safe area on top, room for the floating nav below */
+.screen {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  min-width: 0;
+  padding: calc(22px + env(safe-area-inset-top)) var(--gutter) var(--nav-clearance);
+  animation: screen-in 120ms ease-out;
+}
+
+.screen--tight {
+  gap: 18px;
+}
+
+.screen--ficha {
+  gap: 24px;
+}
+
+.screen-empty {
+  padding: 24px;
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text-soft);
+  font: 400 14px/1.5 var(--font-body);
+  text-align: center;
+}
+
+/* §10 Press feedback */
+.pressable {
+  transition: transform 120ms ease-out, color 150ms, background-color 150ms;
+}
+
+.pressable:active {
+  transform: scale(0.97);
+}
+
+@keyframes screen-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .pressable:active {
+    transform: none;
+  }
+}

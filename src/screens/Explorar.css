@@ -1,0 +1,255 @@
+/* Explore — spec §9.3 */
+.search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 48px;
+  padding: 0 6px 0 15px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.search__input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font: 400 16px/1 var(--font-body);
+  outline: none;
+}
+
+.search__input::placeholder {
+  color: var(--muted);
+}
+
+.search__input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.search__clear {
+  flex: none;
+  width: var(--tap);
+  height: var(--tap);
+  font: 400 22px/1 var(--font-body);
+  color: var(--muted);
+}
+
+.filters {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  min-width: 0;
+}
+
+.filters__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 28px;
+  text-align: left;
+}
+
+.filters__type {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--bg);
+}
+
+.filters__type-btn {
+  height: 36px;
+  border-radius: 9px;
+  color: var(--muted);
+  font: 600 13px/1 var(--font-body);
+}
+
+.filters__type-btn.is-selected {
+  background: var(--surface-3);
+  color: #fff;
+  font-weight: 700;
+}
+
+.filters__group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.filters__group .t-eyebrow {
+  color: var(--muted);
+}
+
+.filters__hint {
+  font: 400 13px/1.4 var(--font-body);
+  color: var(--muted);
+}
+
+.filters__platforms {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.platform-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  min-width: 0;
+  padding: 0 8px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font: 700 13px/1 var(--font-body);
+}
+
+.platform-btn__dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  opacity: 0.4;
+}
+
+.platform-btn.is-on {
+  border: 1px solid var(--line-control);
+  color: var(--text);
+}
+
+.platform-btn.is-on .platform-btn__dot {
+  opacity: 1;
+}
+
+.filters__epochs {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+
+.epoch-btn {
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font: 600 13px/1 var(--font-body);
+}
+
+.epoch-btn.is-selected {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 700;
+}
+
+.filters__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filters__chips .chip {
+  height: 32px;
+}
+
+.filters__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.filters__imdb {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font: 800 15px/1 var(--font-body);
+}
+
+.filters__range {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.filters__rule {
+  border: none;
+  height: 1px;
+  background: var(--line);
+}
+
+.filters__check {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: var(--tap);
+  font: 600 14px/1.2 var(--font-body);
+}
+
+.filters__check input {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  accent-color: var(--accent);
+}
+
+.results-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.results-bar__count {
+  flex: none;
+  font: var(--t-meta);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.results-bar .segmented {
+  padding: 3px;
+  border-radius: 11px;
+  grid-template-columns: auto auto !important;
+}
+
+.results-bar .segmented__item {
+  height: 32px;
+  padding: 0 11px;
+  font-size: 12px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  min-width: 0;
+}
+
+.grid__skeleton {
+  aspect-ratio: 2 / 3;
+}
+
+.grid__end {
+  height: 1px;
+}
+
+.from-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}

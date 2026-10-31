@@ -1,0 +1,16 @@
+{
+  "name": "Butaca",
+  "short_name": "Butaca",
+  "description": "Lo que he visto, lo que quiero ver y lo que ha llegado a mis plataformas.",
+  "lang": "es-ES",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0B0D12",
+  "theme_color": "#0B0D12",
+  "start_url": "./",
+  "scope": "./",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

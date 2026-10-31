@@ -1,0 +1,23 @@
+.segmented {
+  display: grid;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.segmented__item {
+  min-width: 0;
+  height: 38px;
+  padding: 0 6px;
+  border-radius: 10px;
+  color: var(--muted);
+  font: 600 13px/1 var(--font-body);
+}
+
+.segmented__item.is-selected {
+  background: var(--surface-3);
+  color: #fff;
+  font-weight: 700;
+}

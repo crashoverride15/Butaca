@@ -1,0 +1,120 @@
+.hero {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.hero__track {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  border-radius: 22px;
+  scrollbar-width: none;
+}
+
+.hero__track::-webkit-scrollbar {
+  display: none;
+}
+
+.hero__slide {
+  position: relative;
+  flex: 0 0 100%;
+  scroll-snap-align: start;
+  height: 220px;
+  border-radius: 22px;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.hero__art {
+  position: absolute;
+  inset: 0;
+}
+
+.hero__art .artwork__ghost {
+  font-size: 150px;
+}
+
+.hero__shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(11, 13, 18, 0) 30%, rgba(11, 13, 18, 0.92) 100%);
+}
+
+.hero__pill {
+  position: absolute;
+  top: 16px;
+  left: 18px;
+  max-width: calc(100% - 36px);
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--overlay-glass);
+  color: var(--text-2);
+  font: 600 12px/1 var(--font-body);
+}
+
+.hero__body {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.hero__eyebrow {
+  font: 600 13px/1 var(--font-condensed);
+  letter-spacing: 1.6px;
+  color: var(--warm-eyebrow);
+}
+
+.hero__title {
+  font: var(--t-hero);
+  letter-spacing: var(--t-hero-track);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hero__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.hero__meta {
+  font: var(--t-meta);
+  color: var(--text-soft);
+}
+
+.hero__ratings {
+  flex: none;
+  display: flex;
+  gap: 6px;
+}
+
+.hero__dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+
+.hero__dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--line-strong);
+}
+
+.hero__dots span.is-on {
+  background: var(--accent);
+}

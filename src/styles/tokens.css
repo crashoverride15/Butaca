@@ -1,0 +1,70 @@
+/* Design tokens — spec §4. Single dark theme. */
+:root {
+  /* 4.1 Colors */
+  --bg: #0B0D12;
+  --surface: #151922;
+  --surface-2: #1E2430;
+  --surface-3: #2B3240;
+  --line: #232937;
+  --line-soft: #1E2430;
+  --line-strong: #2B3240;
+  --line-control: #3A4352;
+  --line-dashed: #4A5363;
+
+  --text: #F2F3F5;
+  --text-2: #E9ECF1;
+  --text-soft: #C5CBD6;
+  --muted: #98A1B0;
+
+  --accent: #E5484D;
+  --accent-soft: #2A1418;
+  --accent-text: #FF6B70;
+  --accent-light: #FF8A8E;
+  --on-accent: #FFFFFF;
+
+  --gold: #F5B544;
+  --rt: #F25C3C;
+  --warm-eyebrow: #F4B26A;
+
+  --overlay-pill: rgba(11, 13, 18, 0.70);
+  --overlay-glass: rgba(11, 13, 18, 0.55);
+  --nav-glass: rgba(21, 25, 34, 0.88);
+
+  --prime: #4FA3E0;
+  --disney: #5B7CFA;
+  --hbo: #A66BFA;
+  --platform-other: #98A1B0;
+
+  /* 4.2 Typography */
+  --font-display: 'Bricolage Grotesque', Figtree, sans-serif;
+  --font-body: Figtree, 'Helvetica Neue', Arial, sans-serif;
+  --font-condensed: 'Barlow Condensed', Arial, sans-serif;
+
+  /* font shorthand: weight size/line-height family; tracking in -track */
+  --t-hero: 800 34px/1.0 var(--font-display);
+  --t-hero-track: -0.8px;
+  --t-title-xl: 800 32px/1.0 var(--font-display);
+  --t-title-xl-track: -0.8px;
+  --t-screen: 800 30px/1.1 var(--font-display);
+  --t-screen-track: -0.7px;
+  --t-greeting: 800 26px/1.1 var(--font-display);
+  --t-greeting-track: -0.6px;
+  --t-card-xl: 800 24px/1.1 var(--font-display);
+  --t-card-xl-track: -0.4px;
+  --t-section: 700 19px/1.2 var(--font-display);
+  --t-row-title: 700 16px/1.3 var(--font-body);
+  --t-card-title: 700 15px/1.3 var(--font-body);
+  --t-body: 400 14px/1.55 var(--font-body);
+  --t-label: 600 14px/1.3 var(--font-body);
+  --t-meta: 400 13px/1.3 var(--font-body);
+  --t-small: 600 12px/1.3 var(--font-body);
+  --t-tiny: 600 11px/1.2 var(--font-body);
+  --t-eyebrow: 600 13px/1.2 var(--font-condensed);
+  --t-eyebrow-track: 1.4px;
+  --t-poster: 700 22px/0.95 var(--font-condensed);
+
+  /* 3 / 4.4 Layout */
+  --gutter: 20px;
+  --nav-clearance: 110px;
+  --tap: 44px;
+}

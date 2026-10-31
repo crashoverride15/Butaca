@@ -1,0 +1,22 @@
+.swipe {
+  position: relative;
+  min-width: 0;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.swipe__action {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 88px;
+  background: var(--accent);
+  color: #fff;
+  font: 700 14px/1 var(--font-body);
+}
+
+.swipe__content {
+  position: relative;
+  touch-action: pan-y;
+}

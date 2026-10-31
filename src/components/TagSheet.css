@@ -1,0 +1,13 @@
+.tag-sheet__group,
+.tag-sheet__new {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.tag-sheet__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
