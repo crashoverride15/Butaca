@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ensureRatings } from '../../api/omdb';
-import { discover, getTitle } from '../../api/tmdb';
+import { discover, getTitle, withEpisodes } from '../../api/tmdb';
 import { PosterTile } from '../../components/PosterTile';
 import { parseKey, titleToCard } from '../../logic/cards';
 import { platformLabel } from '../../logic/platform';
@@ -60,7 +60,8 @@ export function Similar({ title, mine }: { title: Title; mine: Provider[] }) {
       const estimated: Record<string, string | null> = {};
       if (title.type === 'tv') {
         const labelled = await loadLabelled(entries);
-        for (const t of [title, ...candidates]) estimated[t.key] = estimateMoment(t, labelled).moment;
+        const told = await Promise.all([title, ...candidates].map(withEpisodes));
+        for (const t of told) estimated[t.key] = estimateMoment(t, labelled).moment;
       }
       const result = similarTo({ target: title, targetEntry: library[title.key], candidates, library, seen, mine, estimated });
       if (!alive) return;

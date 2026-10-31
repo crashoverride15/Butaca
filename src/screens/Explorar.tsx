@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { discover, getGenres, personCredits, searchMulti, type PersonHit } from '../api/tmdb';
+import { discover, getGenres, getTitle, personCredits, searchMulti, withEpisodes, type PersonHit } from '../api/tmdb';
+import { loadLabelled } from '../hooks/useMomentRows';
+import { estimateMoment, type LabelledSeries } from '../logic/seriesMoment';
 import { Icon } from '../components/Icon';
 import { LazyTile } from '../components/LazyTile';
 import { Segmented } from '../components/Segmented';
@@ -21,6 +23,8 @@ import './Explorar.css';
 // Explore — spec §9.3.
 
 const SEARCH_DELAY = 350;
+/** with a moment chosen, read up to two more pages until at least this many series fit */
+const MOMENT_MIN = 6;
 
 export function Explorar() {
   const { settings } = useSettings();
@@ -58,6 +62,12 @@ export function Explorar() {
     return filters.animation === 'only' ? [...sets, [ANIMATION_GENRE]] : sets;
   }, [chosenTags, genres, filters.type, filters.animation]);
   const localTags = useMemo(() => localOnlyTags(chosenTags, genres, filters.type), [chosenTags, genres, filters.type]);
+  // series by moment (D42): TMDB cannot filter by it, so each result is placed with the same estimate as Inicio
+  const momentIds = useMemo(() => (filters.type === 'tv' ? chosenTags.filter((t) => t.group === 'momento').map((t) => t.id) : []), [chosenTags, filters.type]);
+  const labelled = useRef<LabelledSeries[] | null>(null);
+  useEffect(() => {
+    labelled.current = null;
+  }, [library]);
 
   const isSeen = useCallback(
     (e: LibraryEntry) => {
@@ -86,9 +96,30 @@ export function Explorar() {
       setLoading(true);
       setError(false);
       try {
-        const res = await discover(filters.type, discoverParams(filters, mine, genreSets), page);
+        const byMoment = async (cards: TitleCard[]): Promise<TitleCard[]> => {
+          if (momentIds.length === 0) return cards;
+          labelled.current ??= await loadLabelled(Object.values(library));
+          const known = labelled.current;
+          const kept = await Promise.all(
+            cards.map(async (c) => {
+              const own = library[c.key]?.tagIds.filter((id) => id.startsWith('momento:')) ?? [];
+              if (own.length > 0) return own.some((id) => momentIds.includes(id)) ? c : null;
+              const t = await getTitle('tv', c.tmdbId).then(withEpisodes).catch(() => null);
+              const m = t ? estimateMoment(t, known).moment : null;
+              return m && momentIds.includes(m) ? c : null;
+            }),
+          );
+          return kept.filter((c): c is TitleCard => c !== null);
+        };
+        let res = await discover(filters.type, discoverParams(filters, mine, genreSets), page);
         if (my !== run.current) return;
-        let items = filterCards(res.items, filters, library, isSeen, genreSets);
+        let items = await byMoment(filterCards(res.items, filters, library, isSeen, genreSets));
+        // a moment keeps only some of each page: read a couple more so the screen is not left empty
+        while (momentIds.length > 0 && items.length < MOMENT_MIN && res.page < res.totalPages && res.page < page + 2) {
+          res = await discover(filters.type, discoverParams(filters, mine, genreSets), res.page + 1);
+          if (my !== run.current) return;
+          items = [...items, ...(await byMoment(filterCards(res.items, filters, library, isSeen, genreSets)))];
+        }
         if (filters.order === 'nuevas') items = orderByArrival(items, await firstSeenMap(filters.type));
         if (fromList.length > 0) items = orderByAffinity(items, profileOf(fromList));
         if (my !== run.current) return;
@@ -101,7 +132,7 @@ export function Explorar() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [filters, mine, genreSets, library, fromList],
+    [filters, mine, genreSets, library, fromList, momentIds],
   );
 
   // New query or new filters: start again from page 1.

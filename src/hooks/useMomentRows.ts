@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { DETAIL_VERSION, getTitle } from '../api/tmdb';
+import { DETAIL_VERSION, getTitle, withEpisodes } from '../api/tmdb';
 import { buildKindProfile, rankByTaste } from '../logic/featured';
 import { estimateMoment, MOMENT_IDS, MOMENT_LABELS, type LabelledSeries, type MomentId } from '../logic/seriesMoment';
 import { todayIso, watchStatus } from '../logic/status';
@@ -13,6 +13,8 @@ import { tasteCandidates } from './useFeatured';
 
 const PER_ROW = 20;
 const CANDIDATE_LOADS = 90;
+/** the best this many candidates get their episodes read to place them in a row */
+const STORY_READS = 90;
 
 export interface MomentRowItem {
   title: Title;
@@ -28,8 +30,8 @@ export interface MomentRow {
 /** A title with all the detail D39 added: cache if it has it, else fetched again (the old copy if the network fails). */
 async function enriched(key: string, type: 'tv', tmdbId: number): Promise<Title | undefined> {
   const cached = await getTitleCached(key);
-  if (cached?.detailVersion === DETAIL_VERSION) return cached;
-  return getTitle(type, tmdbId).catch(() => cached);
+  const t = cached?.detailVersion === DETAIL_VERSION ? cached : await getTitle(type, tmdbId).catch(() => cached);
+  return t && withEpisodes(t);
 }
 
 /** My series with a moment: they teach what each moment looks like. */
@@ -79,8 +81,11 @@ export function useMomentRows(): MomentRow[] | null {
         const discovered = await tasteCandidates('tv', profile, entries, settings.platforms, CANDIDATE_LOADS);
         const result = rankByTaste({ mine: settings.platforms, kind: 'tv', entries, titles, seen, discovered });
         const buckets = new Map<MomentId, MomentRowItem[]>(MOMENT_IDS.map((m) => [m, []]));
-        for (const c of result?.ranked ?? []) {
-          const { moment } = estimateMoment(c.title, labelled);
+        // how their episodes tell the story (D42): read once per series, then kept
+        const ranked = (result?.ranked ?? []).slice(0, STORY_READS);
+        const told = await Promise.all(ranked.map((c) => withEpisodes(c.title)));
+        for (const [i, c] of ranked.entries()) {
+          const { moment } = estimateMoment(told[i], labelled);
           const bucket = moment ? buckets.get(moment) : undefined;
           if (!bucket || bucket.length >= PER_ROW) continue;
           const mark = c.source ? result?.scores[c.source.title.key] : null;

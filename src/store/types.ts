@@ -1,5 +1,7 @@
 // Data model — spec §5.
 
+import type { EpisodeSignal } from '../logic/episodes';
+
 export type MediaType = 'movie' | 'tv';
 
 export interface Provider {
@@ -56,6 +58,8 @@ export interface Title {
   lastAirDate?: string | null;
   networks?: string[];
   createdBy?: string[];
+  /** how its episodes tell the story (D42); null = read, but too little to say; absent = not read yet */
+  episodeSignal?: EpisodeSignal | null;
 }
 
 export interface LibraryEntry {

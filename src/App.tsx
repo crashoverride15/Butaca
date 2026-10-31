@@ -4,6 +4,7 @@ import { BottomNav } from './components/BottomNav';
 import { ToastProvider } from './components/Toast';
 import { Ajustes } from './screens/Ajustes';
 import { Avisos } from './screens/Avisos';
+import { Clasificar } from './screens/Clasificar';
 import { Explorar } from './screens/Explorar';
 import { Ficha } from './screens/Ficha';
 import { Gustos } from './screens/Gustos';
@@ -39,6 +40,7 @@ function Layout() {
         <Route path="/explorar" element={<Explorar />} />
         <Route path="/gustos" element={<Gustos />} />
         <Route path="/lista" element={<MiLista />} />
+        <Route path="/clasificar" element={<Clasificar />} />
         <Route path="/avisos" element={<Avisos />} />
         <Route path="/ajustes" element={<Ajustes />} />
         <Route path="*" element={<Navigate to="/" replace />} />

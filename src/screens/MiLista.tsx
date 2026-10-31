@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Chip } from '../components/Chip';
 import { Icon } from '../components/Icon';
 import { ListRow } from '../components/ListRow';
@@ -7,6 +7,7 @@ import { ScoreSheet } from '../components/ScoreSheet';
 import { Sheet } from '../components/Sheet';
 import { SwipeRow } from '../components/SwipeRow';
 import { useTitles } from '../hooks/useTitles';
+import { momentsOf, seriesToClassify } from '../logic/classify';
 import { buildRows, countByTab, filterRows, SORT_LABEL, SORT_ORDER, sortRows, type ListTab, type SortKey } from '../logic/list';
 import { platformLabel } from '../logic/platform';
 import { todayIso } from '../logic/status';
@@ -56,6 +57,9 @@ export function MiLista() {
   const tagName = (id: string) => tags.find((t) => t.id === id)?.name;
   const filterTags = tags.filter((t) => t.group === 'momento' || t.group === 'estilo' || t.group === 'libre');
 
+  const toClassify = seriesToClassify(entries ?? []);
+  const unclassified = toClassify.length === 0 ? null : toClassify.filter((e) => momentsOf(e).length === 0).length;
+
   const loading = entries === null || (keys.length > 0 && rows.length === 0 && Object.keys(titles).length === 0);
 
   return (
@@ -70,6 +74,16 @@ export function MiLista() {
           </button>
         ))}
       </div>
+
+      {unclassified !== null && (
+        <Link to="/clasificar" className="classify-link pressable">
+          <span className="classify-link__text">
+            <span className="classify-link__title ellipsis">Clasificar series</span>
+            <span className="classify-link__sub ellipsis">{unclassified > 0 ? `${unclassified} sin momento` : 'Todas con momento'}</span>
+          </span>
+          <span className="classify-link__go" aria-hidden="true">›</span>
+        </Link>
+      )}
 
       <div className="list-filters">
         <div className="list-filters__chips">

@@ -2,6 +2,7 @@ import { DAY, HOUR, isFresh, readCache, writeCache } from '../store/cache';
 import { getTitleCached, putTitle } from '../store/titles';
 import { getSettings } from '../store/settings';
 import { makeKey, type MediaType, type Provider, type Title, type TitleCard } from '../store/types';
+import { episodeSignal, seasonToSample } from '../logic/episodes';
 import { ApiError, logApiFailure } from './errors';
 import { createQueue } from './queue';
 
@@ -170,6 +171,8 @@ export function mapTitle(type: MediaType, raw: RawDetail, now = Date.now(), prev
     title.seasons = (raw.seasons ?? [])
       .filter((s) => s.season_number > 0)
       .map((s) => ({ number: s.season_number, episodeCount: s.episode_count, airDate: s.air_date }));
+    // read once (D42): a season's synopses do not change
+    if (previous?.episodeSignal !== undefined) title.episodeSignal = previous.episodeSignal;
     title.lastEpisodeToAir = episodeRef(raw.last_episode_to_air);
     title.nextEpisodeToAir = episodeRef(raw.next_episode_to_air);
   }
@@ -201,6 +204,29 @@ export async function getTitle(type: MediaType, tmdbId: number, opts: { force?: 
   } catch (e) {
     if (cached) return cached;
     throw e;
+  }
+}
+
+/**
+ * A series with how its episodes tell the story (D42): the synopses of its first full season, in English (more
+ * complete), read once and kept with the title. On a network failure it comes back as it was, to try another day.
+ */
+export async function withEpisodes(title: Title): Promise<Title> {
+  if (title.type !== 'tv' || title.episodeSignal !== undefined) return title;
+  const season = seasonToSample(title.seasons ?? []);
+  if (season === null) return title;
+  const keep = async (signal: Title['episodeSignal']): Promise<Title> => {
+    const updated = { ...((await getTitleCached(title.key)) ?? title), episodeSignal: signal };
+    await putTitle(updated);
+    return updated;
+  };
+  try {
+    const raw = await tmdbGet<{ episodes?: { name?: string; overview?: string }[] }>(`/tv/${title.tmdbId}/season/${season}`, { language: 'en-US' });
+    return await keep(episodeSignal(raw.episodes ?? []));
+  } catch (e) {
+    if (e instanceof ApiError && e.kind === 'missing') return keep(null);
+    logApiFailure(`TMDB season of ${title.key}`, e);
+    return title;
   }
 }
 
