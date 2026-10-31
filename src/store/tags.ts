@@ -7,6 +7,7 @@ import type { Tag, TagGroup } from './types';
 const INITIAL: { name: string; group: TagGroup }[] = [
   { name: 'Noche', group: 'momento' },
   { name: 'Maratón', group: 'momento' },
+  { name: 'Random', group: 'momento' },
   { name: 'Entre semana', group: 'momento' },
   { name: 'Para dormirme', group: 'momento' },
   { name: 'Policíaca', group: 'estilo' },
@@ -29,9 +30,29 @@ const slug = (s: string) =>
 
 export const tagId = (group: TagGroup, name: string) => `${group}:${slug(name)}`;
 
+// Moment tags added after the first release: existing installs get them once (a deleted one stays deleted).
+const ADDED_LATER = ['Maratón', 'Random'];
+const ADDED_LATER_FLAG = 'butaca.tags.maraton-random';
+
+async function topUpLaterTags(): Promise<void> {
+  try {
+    if (localStorage.getItem(ADDED_LATER_FLAG)) return;
+    localStorage.setItem(ADDED_LATER_FLAG, '1');
+  } catch {
+    return;
+  }
+  const db = await getDb();
+  const all = await db.getAll('tags');
+  let order = all.reduce((m, t) => Math.max(m, t.order), -1) + 1;
+  for (const name of ADDED_LATER) {
+    const id = tagId('momento', name);
+    if (!all.some((t) => t.id === id)) await db.put('tags', { id, name, group: 'momento', order: order++ });
+  }
+}
+
 export async function ensureInitialTags(): Promise<void> {
   const db = await getDb();
-  if ((await db.count('tags')) > 0) return;
+  if ((await db.count('tags')) > 0) return topUpLaterTags();
   const tx = db.transaction('tags', 'readwrite');
   INITIAL.forEach((t, order) => tx.store.put({ id: tagId(t.group, t.name), name: t.name, group: t.group, order }));
   await tx.done;

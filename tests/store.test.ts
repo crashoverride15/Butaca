@@ -38,8 +38,8 @@ describe('tags', () => {
     await ensureInitialTags();
     await ensureInitialTags();
     const tags = await listTags();
-    expect(tags).toHaveLength(12);
-    expect(tags.filter((t) => t.group === 'momento').map((t) => t.name)).toEqual(['Noche', 'Maratón', 'Entre semana', 'Para dormirme']);
+    expect(tags).toHaveLength(13);
+    expect(tags.filter((t) => t.group === 'momento').map((t) => t.name)).toEqual(['Noche', 'Maratón', 'Random', 'Entre semana', 'Para dormirme']);
     expect(tags.find((t) => t.group === 'origen')?.name).toBe('Española');
   });
 
