@@ -6,6 +6,7 @@ import type { Tag, TagGroup } from './types';
 
 const INITIAL: { name: string; group: TagGroup }[] = [
   { name: 'Noche', group: 'momento' },
+  { name: 'Maratón', group: 'momento' },
   { name: 'Entre semana', group: 'momento' },
   { name: 'Para dormirme', group: 'momento' },
   { name: 'Policíaca', group: 'estilo' },

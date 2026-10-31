@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deckParams, isParked, markNotSeen, markSeen, rankDeck } from '../src/logic/gustos';
+import { deckParams, isParked, markNotSeen, markSeen, markSeriesSeen, rankDeck } from '../src/logic/gustos';
 import { isEmptyEntry, emptyEntry } from '../src/store/library';
 import type { TitleCard } from '../src/store/types';
 
@@ -53,5 +53,12 @@ describe('Gustos deck (D28)', () => {
     expect(isParked(notSeen, 31 * day + 1000)).toBe(false);
     expect(isParked({ ...notSeen, inWatchlist: true }, 31 * day)).toBe(true);
     expect(isParked(markSeen(emptyEntry('movie:2', 'movie', 0), null, 8, 0), 31 * day)).toBe(true);
+  });
+  it('series seen up to a season: that season and the ones before, still in progress, with its tags and score', () => {
+    const three = [{ number: 1, aired: 2, total: 2 }, { number: 2, aired: 3, total: 3 }, { number: 3, aired: 4, total: 4 }];
+    const out = markSeriesSeen(emptyEntry('tv:1', 'tv', 0), three, 2, 8, ['momento:noche', 'momento:maraton']);
+    expect(out.seenEpisodes).toEqual({ 1: [1, 2], 2: [1, 2, 3] });
+    expect(out).toMatchObject({ myScore: 8, tagIds: ['momento:noche', 'momento:maraton'], notSeenAt: null });
+    expect(markSeriesSeen(emptyEntry('tv:1', 'tv', 0), three, null, null, []).seenEpisodes).toEqual({ 1: [1, 2], 2: [1, 2, 3], 3: [1, 2, 3, 4] });
   });
 });

@@ -4,15 +4,17 @@ import { getTitle } from '../api/tmdb';
 import { Artwork } from '../components/Artwork';
 import { Icon } from '../components/Icon';
 import { Segmented } from '../components/Segmented';
+import { SeriesAnswerSheet } from '../components/SeriesAnswerSheet';
 import { SwipeCard, type SwipeCardHandle, type Throw } from '../components/SwipeCard';
 import { useToast } from '../components/Toast';
 import { useDeck } from '../hooks/useDeck';
 import { useKind } from '../hooks/useKind';
 import { KINDS } from '../logic/featured';
-import { markNotSeen, markSeen } from '../logic/gustos';
+import { markNotSeen, markSeen, markSeriesSeen } from '../logic/gustos';
 import { todayIso } from '../logic/status';
-import { seasonsOf } from '../logic/watched';
+import { seasonsOf, type SeasonInfo } from '../logic/watched';
 import { emptyEntry, getEntry, saveEntry } from '../store/library';
+import { createTag, tagId } from '../store/tags';
 import { useSettings } from '../store/SettingsContext';
 import type { TitleCard } from '../store/types';
 import './Gustos.css';
@@ -29,28 +31,24 @@ export function Gustos() {
   const navigate = useNavigate();
   const card = useRef<SwipeCardHandle>(null);
   const [score, setScore] = useState<number | null>(null);
+  // a series answered "seen" waits for the sheet; `nonce` brings the card back if it is cancelled
+  const [pending, setPending] = useState<{ card: TitleCard; seasons: SeasonInfo[] } | null>(null);
+  const [nonce, setNonce] = useState(0);
   const top = deck.cards[0];
 
   useEffect(() => setScore(null), [top?.key]);
 
-  const decide = async (c: TitleCard, dir: Throw) => {
-    const before = await getEntry(c.key);
-    const base = before ?? emptyEntry(c.key, c.type);
+  const finish = async (c: TitleCard, before: Awaited<ReturnType<typeof getEntry>>, next: ReturnType<typeof markNotSeen>, label: string) => {
     try {
-      let next;
-      if (dir === 'right') {
-        const seasons = c.type === 'tv' ? seasonsOf(await getTitle('tv', c.tmdbId), todayIso()) : null;
-        next = markSeen(base, seasons, score);
-      } else next = markNotSeen(base);
       await saveEntry(next);
     } catch (e) {
       console.warn('[butaca] could not save the answer', e);
       toast.show('No se ha podido guardar. Prueba otra vez.');
       deck.restore(c);
+      setNonce((n) => n + 1);
       return;
     }
     deck.answered();
-    const label = dir === 'right' ? (score ? `Vista · ${score}` : 'Vista, sin nota') : 'No vista';
     toast.show(label, [
       {
         label: 'Deshacer',
@@ -59,6 +57,35 @@ export function Gustos() {
         },
       },
     ]);
+  };
+
+  const decide = async (c: TitleCard, dir: Throw) => {
+    const before = await getEntry(c.key);
+    const base = before ?? emptyEntry(c.key, c.type);
+    if (dir === 'left') return finish(c, before, markNotSeen(base), 'No vista');
+    try {
+      if (c.type === 'tv') {
+        // a series needs to know how far I got: ask first
+        setPending({ card: c, seasons: seasonsOf(await getTitle('tv', c.tmdbId), todayIso()) });
+        return;
+      }
+      await finish(c, before, markSeen(base, null, score), score ? `Vista · ${score}` : 'Vista, sin nota');
+    } catch (e) {
+      console.warn('[butaca] could not load the series', e);
+      toast.show('No se ha podido cargar la serie. Prueba otra vez.');
+      setNonce((n) => n + 1);
+    }
+  };
+
+  const saveSeries = async (upTo: number | null, styles: string[]) => {
+    if (!pending) return;
+    const { card: c, seasons } = pending;
+    setPending(null);
+    for (const name of styles) await createTag(name, 'momento'); // already there: ignored
+    const before = await getEntry(c.key);
+    const next = markSeriesSeen(before ?? emptyEntry(c.key, c.type), seasons, upTo, score, styles.map((n) => tagId('momento', n)));
+    const where = upTo === null ? 'entera' : `hasta T${upTo}`;
+    await finish(c, before, next, `Vista ${where}${score ? ` · ${score}` : ''}`);
   };
 
   return (
@@ -84,7 +111,7 @@ export function Gustos() {
         <>
           <div className="gustos__stage">
             <SwipeCard
-              key={top.key}
+              key={`${top.key}:${nonce}`}
               ref={card}
               rightLabel="VISTA"
               leftLabel="NO VISTA"
@@ -128,6 +155,7 @@ export function Gustos() {
           </div>
         </>
       )}
+      {pending && <SeriesAnswerSheet title={pending.card.title} seasons={pending.seasons} onSave={(u, st) => void saveSeries(u, st)} onCancel={() => { setPending(null); setNonce((n) => n + 1); }} />}
     </main>
   );
 }

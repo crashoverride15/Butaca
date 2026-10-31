@@ -1,5 +1,7 @@
 /* Gustos — D28 */
+/* a thrown card leaves the screen: whatever sticks out must not widen the page (as the field zoom did in D16) */
 .gustos {
+  overflow-x: clip;
   /* the nav is 62 pt plus its gap: less clearance than the other screens, the deck must fit */
   padding-bottom: 100px;
 }

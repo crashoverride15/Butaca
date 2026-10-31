@@ -1,4 +1,4 @@
-import { toggleSeries, isSeriesSeen, type SeasonInfo } from './watched';
+import { toggleSeries, isSeriesSeen, markUpTo, type SeasonInfo } from './watched';
 import { discoverParamsFor, type Profile } from './featured';
 import type { LibraryEntry, Provider, TitleCard } from '../store/types';
 
@@ -10,6 +10,15 @@ export function markSeen(entry: LibraryEntry, seasons: SeasonInfo[] | null, scor
   if (entry.type === 'movie') next = { ...next, seenAt: entry.seenAt ?? now };
   else if (seasons && !isSeriesSeen(next, seasons)) next = toggleSeries(next, seasons);
   return next;
+}
+
+/** A series I have seen up to a season ("upTo" null = all of it), with how I watch it (tags). */
+export function markSeriesSeen(entry: LibraryEntry, seasons: SeasonInfo[], upTo: number | null, score: number | null, tagIds: string[]): LibraryEntry {
+  const tagged: LibraryEntry = { ...entry, tagIds: [...new Set([...entry.tagIds, ...tagIds])] };
+  if (upTo === null) return markSeen(tagged, seasons, score);
+  const season = seasons.find((s) => s.number === upTo);
+  const next: LibraryEntry = { ...tagged, notSeenAt: null, inWatchlist: false, myScore: score ?? entry.myScore };
+  return markUpTo(next, seasons, upTo, season?.aired ?? 0);
 }
 
 export const markNotSeen = (entry: LibraryEntry, now = Date.now()): LibraryEntry => ({ ...entry, notSeenAt: now });

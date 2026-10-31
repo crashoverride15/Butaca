@@ -1,0 +1,48 @@
+.series-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.series-sheet__label {
+  color: var(--muted);
+}
+
+.series-sheet__seasons {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+
+.series-sheet__season {
+  min-width: 0;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: 700 15px/1 var(--font-body);
+}
+
+.series-sheet__season:first-child {
+  grid-column: span 2;
+}
+
+.series-sheet__season.is-selected {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.series-sheet__styles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.series-sheet__save {
+  height: 50px;
+  margin-top: 6px;
+  border-radius: 16px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font: 700 16px/1 var(--font-body);
+}
