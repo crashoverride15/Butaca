@@ -19,6 +19,10 @@ export interface Profile {
 }
 
 const MAX_CANDIDATES = 5;
+/** A title I have seen can be offered again from this score up (D28). */
+export const REWATCH_SCORE = 8;
+/** How many of the five may be ones I have already seen. */
+const MAX_REWATCH = 2;
 
 function profileFromEntries(chosen: LibraryEntry[], titles: Record<string, Title>): Profile {
   const refs: Ref[] = chosen.filter((e) => titles[e.key]).map((e) => ({ title: titles[e.key], tagIds: e.tagIds }));
@@ -104,7 +108,15 @@ export function pickFeatured(input: FeaturedInput): FeaturedItem[] {
   };
   add(watchlist.map((e) => ({ title: titles[e.key], tagIds: e.tagIds })));
   add(ofKind.map((title) => ({ title, tagIds: [] as string[] })));
-  return out;
+
+  // Titles I have seen and rated well may come back, saying so; never more than MAX_REWATCH of the five.
+  const again = entries
+    .filter((e) => e.type === kind && seen.has(e.key) && (e.myScore ?? 0) >= REWATCH_SCORE && titles[e.key])
+    .sort((x, y) => (y.myScore ?? 0) - (x.myScore ?? 0))
+    .map((e) => ({ title: titles[e.key], pill: `Ya la has visto · tu nota ${e.myScore}` }));
+  const room = Math.min(MAX_REWATCH, again.length);
+  const fresh = out.slice(0, MAX_CANDIDATES - room);
+  return [...fresh, ...again.slice(0, room), ...out.slice(fresh.length)].slice(0, MAX_CANDIDATES);
 }
 
 export const discoverParamsFor = (profile: Profile, mine: Provider[]): Record<string, string | number> => {

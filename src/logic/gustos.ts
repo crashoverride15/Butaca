@@ -14,6 +14,15 @@ export function markSeen(entry: LibraryEntry, seasons: SeasonInfo[] | null, scor
 
 export const markNotSeen = (entry: LibraryEntry, now = Date.now()): LibraryEntry => ({ ...entry, notSeenAt: now });
 
+/** "Not seen" only rests the card: it can come back after this many days (D28). */
+export const REST_DAYS = 30;
+
+/** Entries whose title Gustos must not ask about now: anything I have already answered or saved, except a "not seen" that has rested. */
+export function isParked(entry: LibraryEntry, now = Date.now()): boolean {
+  const onlyNotSeen = !!entry.notSeenAt && entry.seenAt === null && !entry.inWatchlist && entry.myScore === null && entry.tagIds.length === 0 && Object.keys(entry.seenEpisodes).length === 0;
+  return !(onlyNotSeen && now - (entry.notSeenAt ?? 0) > REST_DAYS * 86_400_000);
+}
+
 /** What to ask TMDB for: my taste when there is one (genres only: decades would narrow the deck), else what is popular. */
 export function deckParams(profile: Profile, mine: Provider[]): Record<string, string | number> {
   if (profile.refs.length > 0) return { ...discoverParamsFor({ ...profile, decades: [] }, mine), 'vote_count.gte': 300 };

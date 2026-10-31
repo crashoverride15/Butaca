@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ensureRatings } from '../api/omdb';
 import { discover, getTitle } from '../api/tmdb';
-import { buildKindProfile, discoverParamsFor, pickFeatured, type FeaturedItem, type Kind } from '../logic/featured';
+import { buildKindProfile, discoverParamsFor, pickFeatured, REWATCH_SCORE, type FeaturedItem, type Kind } from '../logic/featured';
 import { todayIso, watchStatus } from '../logic/status';
 import { getAllEntries } from '../store/library';
 import { useSettings } from '../store/SettingsContext';
@@ -23,7 +23,7 @@ export function useFeatured(kind: Kind) {
       const titles: Record<string, Title> = {};
       await Promise.all(
         entries
-          .filter((e) => e.tagIds.length > 0 || e.inWatchlist || e.seenAt !== null)
+          .filter((e) => e.tagIds.length > 0 || e.inWatchlist || e.seenAt !== null || (e.myScore ?? 0) >= REWATCH_SCORE)
           .map(async (e) => {
             const t = await getTitleCached(e.key);
             if (t) titles[e.key] = t;

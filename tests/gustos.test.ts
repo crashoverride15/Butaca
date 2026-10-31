@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deckParams, markNotSeen, markSeen, rankDeck } from '../src/logic/gustos';
+import { deckParams, isParked, markNotSeen, markSeen, rankDeck } from '../src/logic/gustos';
 import { isEmptyEntry, emptyEntry } from '../src/store/library';
 import type { TitleCard } from '../src/store/types';
 
@@ -45,5 +45,13 @@ describe('Gustos deck (D28)', () => {
   it('ranks my genres first, drops answered and repeated cards', () => {
     const out = rankDeck([card(1, [35]), card(2, [80]), card(3, [80, 18]), card(2, [80]), card(4, [35])], profile([80, 18]), new Set(['movie:4']));
     expect(out.map((c) => c.tmdbId)).toEqual([3, 2, 1]);
+  });
+  it('a not-seen card rests 30 days and then can be asked again; anything else stays out', () => {
+    const day = 86_400_000;
+    const notSeen = markNotSeen(emptyEntry('movie:1', 'movie', 0), 1000);
+    expect(isParked(notSeen, 10 * day + 1000)).toBe(true);
+    expect(isParked(notSeen, 31 * day + 1000)).toBe(false);
+    expect(isParked({ ...notSeen, inWatchlist: true }, 31 * day)).toBe(true);
+    expect(isParked(markSeen(emptyEntry('movie:2', 'movie', 0), null, 8, 0), 31 * day)).toBe(true);
   });
 });

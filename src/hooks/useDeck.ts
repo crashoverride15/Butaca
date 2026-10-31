@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { discover } from '../api/tmdb';
 import { buildKindProfile, type Kind, type Profile } from '../logic/featured';
-import { deckParams, rankDeck } from '../logic/gustos';
+import { deckParams, isParked, rankDeck } from '../logic/gustos';
 import { getAllEntries } from '../store/library';
 import { useSettings } from '../store/SettingsContext';
 import { getTitleCached } from '../store/titles';
@@ -78,7 +78,7 @@ export function useDeck(kind: Kind): Deck {
           }),
       );
       if (!alive) return;
-      ctx.current = { profile: buildKindProfile(kind, entries, titles), exclude: new Set(entries.map((e) => e.key)), page: 0, busy: false, alive: true };
+      ctx.current = { profile: buildKindProfile(kind, entries, titles), exclude: new Set(entries.filter((e) => isParked(e)).map((e) => e.key)), page: 0, busy: false, alive: true };
       if (settings.platforms.length === 0) {
         setLoading(false);
         setDone(true);

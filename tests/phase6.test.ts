@@ -78,7 +78,7 @@ describe('featured (D28: movies / series)', () => {
     expect(buildKindProfile('tv', entries, titles).refs.map((r) => r.title.key)).toEqual(['tv:5']);
     expect(buildKindProfile('tv', [entry('movie:1', { myScore: 9 })], titles).refs).toHaveLength(0);
   });
-  it('offers my saved titles of the kind first, then discoveries; never seen ones or another kind', () => {
+  it('offers my saved titles of the kind first, then discoveries, then a well-rated one I saw; never another kind', () => {
     const entries = [
       entry('movie:1', { myScore: 9, seenAt: 1 }),
       entry('movie:2', { inWatchlist: true }),
@@ -87,7 +87,8 @@ describe('featured (D28: movies / series)', () => {
     ];
     const discovered = [title('movie:7', { genres: [{ id: 80, name: 'Crimen' }], year: 1997 }), title('tv:9', { type: 'tv' })];
     const out = pickFeatured({ kind: 'movie', entries, titles, seen: new Set(['movie:1']), discovered });
-    expect(out.map((o) => o.title.key)).toEqual(['movie:2', 'movie:3', 'movie:7']);
+    expect(out.map((o) => o.title.key)).toEqual(['movie:2', 'movie:3', 'movie:7', 'movie:1']);
+    expect(out[3].pill).toBe('Ya la has visto · tu nota 9');
     expect(out[0].pill).toMatch(/^Coincide con \d+ de tus gustos$/);
   });
   it('without a profile it offers the best IMDb of the discoveries and asks for tastes', () => {
@@ -96,6 +97,22 @@ describe('featured (D28: movies / series)', () => {
     expect(out[0].title.key).toBe('movie:8');
     expect(out[0].pill).toBe('Dime tus gustos para afinar');
     expect(pickFeatured({ kind: 'movie', entries: [], titles: {}, seen: new Set(), discovered: [] })).toEqual([]);
+  });
+  it('may offer a title I saw and rated 8 or more, saying so, at most two and never a weak one', () => {
+    const entries = [
+      entry('movie:1', { myScore: 9, seenAt: 1 }),
+      entry('movie:2', { myScore: 8, seenAt: 1 }),
+      entry('movie:3', { myScore: 8, seenAt: 1 }),
+      entry('movie:4', { myScore: 5, seenAt: 1 }),
+    ];
+    const t = { ...titles, 'movie:4': title('movie:4') };
+    const discovered = Array.from({ length: 6 }, (_, i) => title(`movie:${60 + i}`, { genres: [{ id: 80, name: 'Crimen' }] }));
+    const out = pickFeatured({ kind: 'movie', entries, titles: t, seen: new Set(['movie:1', 'movie:2', 'movie:3', 'movie:4']), discovered });
+    expect(out).toHaveLength(5);
+    const again = out.filter((o) => o.pill.startsWith('Ya la has visto'));
+    expect(again.map((o) => o.title.key)).toEqual(['movie:1', 'movie:2']);
+    expect(again[0].pill).toBe('Ya la has visto · tu nota 9');
+    expect(out.some((o) => o.title.key === 'movie:4')).toBe(false);
   });
   it('gives at most five', () => {
     const many = Array.from({ length: 9 }, (_, i) => title(`movie:${50 + i}`));
