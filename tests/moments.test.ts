@@ -29,6 +29,11 @@ describe('series moment (D39)', () => {
     const poi = show('tv:1', { seasons: 5, perSeason: 22, genres: [80, 18], keywords: ['artificial intelligence', 'surveillance'] });
     expect(estimateMoment(poi, []).moment).toBe('momento:entre-semana');
   });
+  it('a sitcom or cartoon that goes on for seasons is Random (Los Simpson)', () => {
+    const simpsons = show('tv:1', { seasons: 35, perSeason: 22, genres: [16, 35], status: 'Returning Series' });
+    expect(estimateMoment(simpsons, []).moment).toBe('momento:random');
+    expect(estimateMoment(show('tv:2', { seasons: 2, perSeason: 8, genres: [35] }), []).moment).toBe('momento:maraton');
+  });
   it('with nothing known, or no clear winner, it says nothing', () => {
     expect(estimateMoment(show('tv:1', { seasons: 0, perSeason: 0 }), []).moment).toBeNull();
     const tie = shapePrior(seriesShape(show('tv:2', { seasons: 3, perSeason: 22 })));

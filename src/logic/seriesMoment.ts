@@ -4,13 +4,16 @@ import type { Title } from '../store/types';
 // What kind of series this is and when it suits (D39): Maratón (short, continuous plot), Entre semana (long, middling
 // plot, like Person of Interest) or Para dormirme (minimal plot, a case per episode, like Bones). Pure.
 
-export const MOMENT_IDS = ['momento:maraton', 'momento:entre-semana', 'momento:para-dormirme'] as const;
+export const MOMENT_IDS = ['momento:maraton', 'momento:entre-semana', 'momento:para-dormirme', 'momento:random'] as const;
 export type MomentId = (typeof MOMENT_IDS)[number];
 export const MOMENT_LABELS: Record<MomentId, string> = {
   'momento:maraton': 'Maratón',
   'momento:entre-semana': 'Entre semana',
   'momento:para-dormirme': 'Para dormir',
+  'momento:random': 'Random',
 };
+
+const zero = (): Record<MomentId, number> => Object.fromEntries(MOMENT_IDS.map((m) => [m, 0])) as Record<MomentId, number>;
 
 // TMDB keyword names (English, lower case). A hint, not a verdict: the series I already classified weigh more.
 const CASE_WORDS = ['procedural', 'detective', 'forensic', 'serial killer', 'murder', 'investigation', 'fbi', 'profiler', 'medical drama', 'lawyer', 'courtroom', 'whodunit', 'police'];
@@ -28,6 +31,8 @@ export interface Shape {
   caseHints: number;
   serialHints: number;
   caseGenre: boolean;
+  /** comedy or animation */
+  light: boolean;
 }
 
 const count = (names: string[], words: string[]): number => words.filter((w) => names.some((n) => n.includes(w))).length;
@@ -47,12 +52,13 @@ export function seriesShape(t: Title): Shape {
     caseHints: count(names, CASE_WORDS),
     serialHints: count(names, SERIAL_WORDS),
     caseGenre: t.genres.some((g) => CASE_GENRES.includes(g.id)) && t.genres.some((g) => g.id === 80 || g.id === 9648),
+    light: t.genres.some((g) => g.id === 35 || g.id === 16),
   };
 }
 
 /** Points by shape alone, 0 to 3, for each moment. */
 export function shapePrior(s: Shape): Record<MomentId, number> {
-  const prior: Record<MomentId, number> = { 'momento:maraton': 0, 'momento:entre-semana': 0, 'momento:para-dormirme': 0 };
+  const prior = zero();
   if (s.seasons === 0) return prior; // nothing known
   const procedural = s.caseHints >= 1 || (s.caseGenre && s.perSeason >= 18 && s.seasons >= 7);
   if (s.seasons <= 3 && s.episodes <= 36) prior['momento:maraton'] = 3;
@@ -69,6 +75,14 @@ export function shapePrior(s: Shape): Record<MomentId, number> {
   if (procedural && s.perSeason >= 12) prior['momento:para-dormirme'] = 2.5 + Math.min(1, s.caseHints * 0.5);
   else if (s.caseGenre && s.perSeason >= 18 && s.seasons >= 4) prior['momento:para-dormirme'] = 0.5;
   if (s.serialHints >= 2) prior['momento:para-dormirme'] -= 1;
+  // a sitcom or cartoon that goes on for seasons is watched in no order (Los Simpson)
+  const light = s.light && s.perSeason >= 18 && s.seasons >= 5;
+  if (light) prior['momento:random'] = 3;
+  else if (s.light && s.seasons >= 4) prior['momento:random'] = 1.5;
+  if (prior['momento:random'] >= 3) {
+    prior['momento:entre-semana'] -= 1.5;
+    prior['momento:para-dormirme'] -= 1;
+  }
   for (const m of MOMENT_IDS) prior[m] = Math.max(0, prior[m]);
   return prior;
 }
@@ -105,7 +119,7 @@ function likeness(a: Title, b: Title, pool: ReturnType<typeof buildPool>): numbe
 export function estimateMoment(title: Title, labelled: LabelledSeries[]): { moment: MomentId | null; scores: Record<MomentId, number> } {
   const prior = shapePrior(seriesShape(title));
   const known = labelled.filter((l) => l.title.key !== title.key && l.moments.some((m) => (MOMENT_IDS as readonly string[]).includes(m)));
-  const learned: Record<MomentId, number> = { 'momento:maraton': 0, 'momento:entre-semana': 0, 'momento:para-dormirme': 0 };
+  const learned = zero();
   if (known.length > 0) {
     const pool = buildPool([title, ...known.map((k) => k.title)]);
     const top = known

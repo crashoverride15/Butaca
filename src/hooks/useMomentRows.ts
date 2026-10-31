@@ -11,7 +11,7 @@ import { tasteCandidates } from './useFeatured';
 
 // The three rows of Inicio → Series (D39): new series on my platforms, by what suits each moment.
 
-const PER_ROW = 10;
+const PER_ROW = 20;
 const CANDIDATE_LOADS = 60;
 
 export interface MomentRowItem {
