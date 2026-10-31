@@ -3,15 +3,16 @@ import { Link, useNavigate } from 'react-router-dom';
 import { HeroCard } from '../components/HeroCard';
 import { ContinueCard } from '../components/ContinueCard';
 import { LazyTile } from '../components/LazyTile';
-import { MomentoSelector, loadMoment } from '../components/MomentoSelector';
+import { Segmented } from '../components/Segmented';
 import { useToast } from '../components/Toast';
 import { useArrivals } from '../hooks/useArrivals';
 import { useFeatured } from '../hooks/useFeatured';
+import { useKind } from '../hooks/useKind';
 import { useTitles } from '../hooks/useTitles';
 import { titleToCard } from '../logic/cards';
 import { formatEpisode } from '../logic/format';
 import { loadFilters, saveFilters } from '../logic/explore';
-import { momentTagId, type Moment } from '../logic/featured';
+import { KINDS, type Kind } from '../logic/featured';
 import { platformLabel } from '../logic/platform';
 import { relativeArrival } from '../logic/novelties';
 import { nextEpisode, todayIso, watchStatus } from '../logic/status';
@@ -23,7 +24,7 @@ import './Inicio.css';
 
 // Home — spec §9.1.
 
-function ContinueSection({ moment }: { moment: Moment }) {
+function ContinueSection() {
   const { settings } = useSettings();
   const toast = useToast();
   const [entries, setEntries] = useState<LibraryEntry[] | null>(null);
@@ -33,7 +34,6 @@ function ContinueSection({ moment }: { moment: Moment }) {
   const tvKeys = useMemo(() => (entries ?? []).filter((e) => e.type === 'tv').map((e) => e.key), [entries]);
   const titles = useTitles(tvKeys, { ratings: false });
   const today = todayIso();
-  const tag = momentTagId(moment);
 
   const rows = useMemo(() => {
     return (entries ?? [])
@@ -44,8 +44,8 @@ function ContinueSection({ moment }: { moment: Moment }) {
         return { entry, title, next: nextEpisode(title, entry, today), progress: totalAired(seasons) ? seenAired(entry, seasons) / totalAired(seasons) : 0 };
       })
       .filter((r) => r.next)
-      .sort((a, b) => Number(b.entry.tagIds.includes(tag)) - Number(a.entry.tagIds.includes(tag)) || b.entry.updatedAt - a.entry.updatedAt);
-  }, [entries, titles, today, tag]);
+      .sort((a, b) => b.entry.updatedAt - a.entry.updatedAt);
+  }, [entries, titles, today]);
 
   const play = async (entry: LibraryEntry, next: { season: number; episode: number }) => {
     await saveEntry(toggleEpisode(entry, next.season, next.episode));
@@ -74,10 +74,10 @@ function ContinueSection({ moment }: { moment: Moment }) {
   );
 }
 
-function NoveltiesSection({ moment }: { moment: Moment }) {
+function NoveltiesSection({ kind }: { kind: Kind }) {
   const { settings } = useSettings();
   const navigate = useNavigate();
-  const items = useArrivals({ days: 14, max: 15, moment });
+  const items = useArrivals({ days: 14, max: 15, kind });
   const now = Date.now();
   if (!items || items.length === 0) return null;
   return (
@@ -114,8 +114,8 @@ function NoveltiesSection({ moment }: { moment: Moment }) {
 
 export function Inicio() {
   const { settings } = useSettings();
-  const [moment, setMoment] = useState<Moment>(() => loadMoment());
-  const featured = useFeatured(moment);
+  const [kind, setKind] = useKind();
+  const featured = useFeatured(kind);
   const navigate = useNavigate();
 
   return (
@@ -135,25 +135,25 @@ export function Inicio() {
           </Link>
         </header>
 
-        <MomentoSelector value={moment} onChange={setMoment} />
+        <Segmented label="Tipo" options={KINDS} value={kind} onChange={setKind} />
 
         <div className={'inicio__hero' + (featured === null ? ' is-loading' : '')}>
           {featured === null ? (
             <div className="skeleton" style={{ height: 220, borderRadius: 22 }} />
           ) : featured.length === 0 ? (
             <div className="screen-empty inicio__empty">
-              <p>Etiqueta algunos títulos con «{moment}» para que te recomiende.</p>
-              <button type="button" className="btn-primary pressable" style={{ height: 44 }} onClick={() => navigate('/explorar')}>
-                <span className="ellipsis">Explorar</span>
+              <p>Cuéntame qué te gusta en Gustos y te recomiendo.</p>
+              <button type="button" className="btn-primary pressable" style={{ height: 44 }} onClick={() => navigate('/gustos')}>
+                <span className="ellipsis">Ir a Gustos</span>
               </button>
             </div>
           ) : (
-            <HeroCard items={featured} moment={moment} mine={settings.platforms} />
+            <HeroCard items={featured} kind={kind} mine={settings.platforms} />
           )}
         </div>
 
-        <ContinueSection moment={moment} />
-        <NoveltiesSection moment={moment} />
+        <ContinueSection />
+        <NoveltiesSection kind={kind} />
       </main>
     </div>
   );

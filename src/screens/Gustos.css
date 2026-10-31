@@ -1,0 +1,122 @@
+/* Gustos — D28 */
+.gustos {
+  /* the nav is 62 pt plus its gap: less clearance than the other screens, the deck must fit */
+  padding-bottom: 100px;
+}
+
+.gustos__head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.gustos__hint {
+  font: var(--t-meta);
+  color: var(--muted);
+}
+
+/* the poster is 2:3 and as big as the screen leaves */
+.gustos__stage {
+  width: min(100%, max(190px, calc((100dvh - 430px) * 2 / 3)));
+  aspect-ratio: 2 / 3;
+  margin: 0 auto;
+}
+
+.gustos__poster {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.gustos__shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(11, 13, 18, 0.92) 0%, rgba(11, 13, 18, 0) 45%);
+  pointer-events: none;
+}
+
+.gustos__caption {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  pointer-events: none;
+}
+
+.gustos__title {
+  font: var(--t-card-xl);
+  letter-spacing: var(--t-card-xl-track);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.gustos__meta {
+  font: var(--t-meta);
+  color: var(--text-soft);
+}
+
+.gustos__scores {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 4px;
+}
+
+.gustos__score {
+  min-width: 0;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: 800 15px/1 var(--font-display);
+}
+
+.gustos__score.is-selected {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.gustos__actions {
+  display: flex;
+  justify-content: center;
+  gap: 56px;
+}
+
+.gustos__btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-soft);
+  font: var(--t-small);
+}
+
+.gustos__circle {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+}
+
+.gustos__btn--yes .gustos__circle {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
+.gustos__link {
+  display: inline-block;
+  margin-top: 12px;
+  color: var(--accent-text);
+  font: var(--t-label);
+}

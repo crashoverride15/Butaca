@@ -1,27 +1,14 @@
 import { pairScore, type Ref } from './similar';
 import type { LibraryEntry, Provider, Title } from '../store/types';
 
-// "Para esta noche" — spec §7.2. Pure: the caller loads the data.
+// Featured title on Home, by kind (movies / series) — spec §7.2 reworked (D28). Pure: the caller loads the data.
 
-export type Moment = 'Noche' | 'Entre semana' | 'Para dormirme';
-export const MOMENTS: Moment[] = ['Noche', 'Entre semana', 'Para dormirme'];
-export const momentTagId = (m: Moment): string =>
-  `momento:${m.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
-
-export const EYEBROW: Record<Moment, string> = {
-  Noche: 'PARA ESTA NOCHE',
-  'Entre semana': 'PARA ENTRE SEMANA',
-  'Para dormirme': 'PARA DORMIRTE',
-};
-
-/** Default moment by hour (spec §8.4). `now` is a local Date. */
-export function defaultMoment(now: Date): Moment {
-  const h = now.getHours();
-  const weekend = now.getDay() === 0 || now.getDay() === 6;
-  if (h >= 21) return 'Noche';
-  if (h < 6) return 'Para dormirme';
-  return weekend ? 'Noche' : 'Entre semana';
-}
+export type Kind = 'movie' | 'tv';
+export const KINDS: { value: Kind; label: string }[] = [
+  { value: 'movie', label: 'Películas' },
+  { value: 'tv', label: 'Series' },
+];
+export const EYEBROW: Record<Kind, string> = { movie: 'PELÍCULA PARA TI', tv: 'SERIE PARA TI' };
 
 export interface Profile {
   refs: Ref[];
@@ -49,13 +36,9 @@ function profileFromEntries(chosen: LibraryEntry[], titles: Record<string, Title
   return { refs, topGenres, decades: [...decades], type: refs.length === 0 ? null : movies >= tv ? 'movie' : 'tv' };
 }
 
-/** Profile of a moment: my titles with its tag rated 7 or more; if none, all tagged with it (spec §7.2). */
-export function buildProfile(moment: Moment, entries: LibraryEntry[], titles: Record<string, Title>): Profile {
-  const tag = momentTagId(moment);
-  const tagged = entries.filter((e) => e.tagIds.includes(tag) && titles[e.key]);
-  const liked = tagged.filter((e) => (e.myScore ?? 0) >= 7);
-  return profileFromEntries(liked.length > 0 ? liked : tagged, titles);
-}
+/** Profile of one kind: my titles of that kind rated 7 or more. */
+export const buildKindProfile = (kind: Kind, entries: LibraryEntry[], titles: Record<string, Title>): Profile =>
+  profileFromEntries(entries.filter((e) => e.type === kind && (e.myScore ?? 0) >= 7), titles);
 
 /** Profile of my whole library: everything rated 7 or more (spec §9.5). */
 export const buildLikedProfile = (entries: LibraryEntry[], titles: Record<string, Title>): Profile =>
@@ -85,59 +68,42 @@ function affinityTo(profile: Profile, title: Title, tagIds: string[]): { score: 
 }
 
 export interface FeaturedInput {
-  moment: Moment;
+  kind: Kind;
   entries: LibraryEntry[];
   titles: Record<string, Title>;
   seen: ReadonlySet<string>;
-  /** `discover` results on my platforms already loaded (step c) */
+  /** `discover` results on my platforms already loaded */
   discovered: Title[];
 }
 
-/** Up to 5 candidates in preference order a → b → c (spec §7.2); empty = show the empty state. */
+/** Up to 5 candidates: my watchlist first, then discoveries on my platforms; empty = show the empty state. */
 export function pickFeatured(input: FeaturedInput): FeaturedItem[] {
-  const { moment, entries, titles, seen, discovered } = input;
-  const profile = buildProfile(moment, entries, titles);
-  const momentTag = momentTagId(moment);
-  const hasAnyMoment = (e: LibraryEntry) => e.tagIds.some((t) => t.startsWith('momento:'));
+  const { kind, entries, titles, seen, discovered } = input;
+  const profile = buildKindProfile(kind, entries, titles);
+  const ofKind = discovered.filter((t) => t.type === kind && !seen.has(t.key));
 
   if (profile.refs.length === 0) {
-    // No profile: the best IMDb among recent discoveries.
-    const best = [...discovered].filter((t) => !seen.has(t.key)).sort((a, b) => (b.ratings.imdb ?? 0) - (a.ratings.imdb ?? 0));
-    const pill = `Elige títulos con el tag ${moment} para afinar`;
-    return best.slice(0, MAX_CANDIDATES).map((title) => ({ title, pill }));
+    // No taste yet: the best IMDb among recent discoveries.
+    const best = [...ofKind].sort((a, b) => (b.ratings.imdb ?? 0) - (a.ratings.imdb ?? 0));
+    return best.slice(0, MAX_CANDIDATES).map((title) => ({ title, pill: 'Dime tus gustos para afinar' }));
   }
 
-  const watchlist = entries.filter((e) => e.inWatchlist && titles[e.key] && !seen.has(e.key));
-  const a = watchlist.filter((e) => e.tagIds.includes(momentTag));
-  const b = watchlist.filter((e) => !hasAnyMoment(e)).filter((e) => {
-    const t = titles[e.key];
-    const genreOk = t.genres.some((g) => profile.topGenres.includes(g.id));
-    const decadeOk = t.year !== null && profile.decades.includes(Math.floor(t.year / 10));
-    return genreOk && decadeOk;
-  });
-
+  const watchlist = entries.filter((e) => e.type === kind && e.inWatchlist && titles[e.key] && !seen.has(e.key));
   const taken = new Set<string>();
   const out: FeaturedItem[] = [];
-  const rank = (candidates: { title: Title; tagIds: string[] }[]) =>
-    candidates
+  const add = (candidates: { title: Title; tagIds: string[] }[]) => {
+    const ranked = candidates
       .map((c) => ({ ...c, ...affinityTo(profile, c.title, c.tagIds) }))
       .sort((x, y) => y.score - x.score || (y.title.ratings.imdb ?? 0) - (x.title.ratings.imdb ?? 0));
-  const add = (candidates: { title: Title; tagIds: string[] }[]) => {
-    for (const c of rank(candidates)) {
+    for (const c of ranked) {
       if (out.length >= MAX_CANDIDATES) return;
       if (taken.has(c.title.key)) continue;
       taken.add(c.title.key);
-      out.push({ title: c.title, pill: `Coincide con ${c.shared} de tus tags` });
+      out.push({ title: c.title, pill: `Coincide con ${c.shared} de tus gustos` });
     }
   };
-
-  add(a.map((e) => ({ title: titles[e.key], tagIds: e.tagIds })));
-  add(b.map((e) => ({ title: titles[e.key], tagIds: e.tagIds })));
-  add(
-    discovered
-      .filter((t) => !seen.has(t.key) && (profile.type === null || t.type === profile.type))
-      .map((title) => ({ title, tagIds: [] as string[] })),
-  );
+  add(watchlist.map((e) => ({ title: titles[e.key], tagIds: e.tagIds })));
+  add(ofKind.map((title) => ({ title, tagIds: [] as string[] })));
   return out;
 }
 

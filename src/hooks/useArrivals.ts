@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { buildLikedProfile, buildProfile, profileAffinity, type Moment } from '../logic/featured';
+import { buildKindProfile, buildLikedProfile, profileAffinity, type Kind } from '../logic/featured';
 import { recentArrivals, type Arrival } from '../logic/novelties';
 import { todayIso, watchStatus } from '../logic/status';
 import { getAllEntries } from '../store/library';
@@ -15,7 +15,7 @@ export interface ArrivalItem {
   title: Title;
 }
 
-export function useArrivals(opts: { days: number; max: number; moment?: Moment }): ArrivalItem[] | null {
+export function useArrivals(opts: { days: number; max: number; kind?: Kind }): ArrivalItem[] | null {
   const { settings } = useSettings();
   const [arrivals, setArrivals] = useState<Arrival[] | null>(null);
   const [entries, setEntries] = useState<LibraryEntry[]>([]);
@@ -40,11 +40,11 @@ export function useArrivals(opts: { days: number; max: number; moment?: Moment }
     if (arrivals === null) return null;
     const today = todayIso();
     const byKey = Object.fromEntries(entries.map((e) => [e.key, e]));
-    const profile = opts.moment ? buildProfile(opts.moment, entries, libraryTitles) : buildLikedProfile(entries, libraryTitles);
+    const profile = opts.kind ? buildKindProfile(opts.kind, entries, libraryTitles) : buildLikedProfile(entries, libraryTitles);
     const items = arrivals
       .map((arrival) => ({ arrival, title: titles[`${arrival.type}:${arrival.tmdbId}`] }))
-      .filter((x): x is ArrivalItem => Boolean(x.title) && watchStatus(x.title, byKey[x.title.key], today) !== 'vista');
+      .filter((x): x is ArrivalItem => Boolean(x.title) && (!opts.kind || x.title.type === opts.kind) && watchStatus(x.title, byKey[x.title.key], today) !== 'vista');
     const score = (x: ArrivalItem) => profileAffinity(profile, x.title, byKey[x.title.key]?.tagIds ?? []);
     return items.sort((a, b) => score(b) - score(a) || b.arrival.firstSeen - a.arrival.firstSeen).slice(0, opts.max);
-  }, [arrivals, entries, titles, libraryTitles, opts.moment, opts.max]);
+  }, [arrivals, entries, titles, libraryTitles, opts.kind, opts.max]);
 }

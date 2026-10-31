@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildProfile, defaultMoment, EYEBROW, momentTagId, pickFeatured } from '../src/logic/featured';
+import { buildKindProfile, EYEBROW, pickFeatured } from '../src/logic/featured';
 import { diffSnapshot, isNew, noveltyDue, recentArrivals, relativeArrival, DAY_MS } from '../src/logic/novelties';
 import { runRefresh, refreshDue, REFRESH_INTERVAL_MS } from '../src/logic/refresh';
 import { isFollowed, seasonAlerts } from '../src/logic/seasons';
@@ -60,50 +60,46 @@ describe('similar (spec §7.1)', () => {
   });
 });
 
-describe('featured (spec §7.2)', () => {
-  const noche = momentTagId('Noche');
+describe('featured (D28: movies / series)', () => {
   const titles = {
     'movie:1': title('movie:1', { genres: [{ id: 80, name: 'Crimen' }], year: 1995 }),
     'movie:2': title('movie:2', { genres: [{ id: 80, name: 'Crimen' }], year: 1996, ratings: { imdb: 8, rt: null, fetchedAt: 1 } }),
     'movie:3': title('movie:3', { genres: [{ id: 35, name: 'Comedia' }], year: 2020 }),
-    'movie:4': title('movie:4', { genres: [{ id: 80, name: 'Crimen' }], year: 1998 }),
+    'tv:5': title('tv:5', { type: 'tv', genres: [{ id: 80, name: 'Crimen' }], year: 2020 }),
   };
 
-  it('knows the default moment by hour and weekday', () => {
-    expect(defaultMoment(new Date(2026, 9, 28, 22))).toBe('Noche');
-    expect(defaultMoment(new Date(2026, 9, 29, 2))).toBe('Para dormirme');
-    expect(defaultMoment(new Date(2026, 9, 28, 12))).toBe('Entre semana');
-    expect(defaultMoment(new Date(2026, 9, 31, 12))).toBe('Noche'); // Saturday
-    expect(EYEBROW['Para dormirme']).toBe('PARA DORMIRTE');
+  it('has one eyebrow per kind', () => {
+    expect(EYEBROW.movie).toBe('PELÍCULA PARA TI');
+    expect(EYEBROW.tv).toBe('SERIE PARA TI');
   });
-  it('builds the profile from tagged titles rated 7 or more, else all tagged', () => {
-    const entries = [entry('movie:1', { tagIds: [noche], myScore: 9 }), entry('movie:3', { tagIds: [noche], myScore: 3 })];
-    expect(buildProfile('Noche', entries, titles).refs.map((r) => r.title.key)).toEqual(['movie:1']);
-    expect(buildProfile('Noche', [entry('movie:3', { tagIds: [noche], myScore: 3 })], titles).refs).toHaveLength(1);
-    expect(buildProfile('Entre semana', entries, titles).refs).toHaveLength(0);
+  it('builds the profile from titles of that kind rated 7 or more', () => {
+    const entries = [entry('movie:1', { myScore: 9 }), entry('movie:3', { myScore: 3 }), entry('tv:5', { type: 'tv', myScore: 10 })];
+    expect(buildKindProfile('movie', entries, titles).refs.map((r) => r.title.key)).toEqual(['movie:1']);
+    expect(buildKindProfile('tv', entries, titles).refs.map((r) => r.title.key)).toEqual(['tv:5']);
+    expect(buildKindProfile('tv', [entry('movie:1', { myScore: 9 })], titles).refs).toHaveLength(0);
   });
-  it('prefers saved titles with the moment tag, then saved untagged that fit, then discovered; never seen ones', () => {
+  it('offers my saved titles of the kind first, then discoveries; never seen ones or another kind', () => {
     const entries = [
-      entry('movie:1', { tagIds: [noche], myScore: 9, seenAt: 1 }),
-      entry('movie:2', { inWatchlist: true, tagIds: [noche] }),
-      entry('movie:4', { inWatchlist: true }),
-      entry('movie:3', { inWatchlist: true }), // does not fit the profile
+      entry('movie:1', { myScore: 9, seenAt: 1 }),
+      entry('movie:2', { inWatchlist: true }),
+      entry('movie:3', { inWatchlist: true }),
+      entry('tv:5', { type: 'tv', inWatchlist: true }),
     ];
-    const discovered = [title('movie:7', { genres: [{ id: 80, name: 'Crimen' }], year: 1997 })];
-    const out = pickFeatured({ moment: 'Noche', entries, titles, seen: new Set(['movie:1']), discovered });
-    expect(out.map((o) => o.title.key)).toEqual(['movie:2', 'movie:4', 'movie:7']);
-    expect(out[0].pill).toMatch(/^Coincide con \d+ de tus tags$/);
+    const discovered = [title('movie:7', { genres: [{ id: 80, name: 'Crimen' }], year: 1997 }), title('tv:9', { type: 'tv' })];
+    const out = pickFeatured({ kind: 'movie', entries, titles, seen: new Set(['movie:1']), discovered });
+    expect(out.map((o) => o.title.key)).toEqual(['movie:2', 'movie:3', 'movie:7']);
+    expect(out[0].pill).toMatch(/^Coincide con \d+ de tus gustos$/);
   });
-  it('without a profile it offers the best IMDb of the discoveries and asks to tag titles', () => {
+  it('without a profile it offers the best IMDb of the discoveries and asks for tastes', () => {
     const discovered = [title('movie:7', { ratings: { imdb: 6, rt: null, fetchedAt: 1 } }), title('movie:8', { ratings: { imdb: 8.5, rt: null, fetchedAt: 1 } })];
-    const out = pickFeatured({ moment: 'Noche', entries: [], titles: {}, seen: new Set(), discovered });
+    const out = pickFeatured({ kind: 'movie', entries: [], titles: {}, seen: new Set(), discovered });
     expect(out[0].title.key).toBe('movie:8');
-    expect(out[0].pill).toBe('Elige títulos con el tag Noche para afinar');
-    expect(pickFeatured({ moment: 'Noche', entries: [], titles: {}, seen: new Set(), discovered: [] })).toEqual([]);
+    expect(out[0].pill).toBe('Dime tus gustos para afinar');
+    expect(pickFeatured({ kind: 'movie', entries: [], titles: {}, seen: new Set(), discovered: [] })).toEqual([]);
   });
   it('gives at most five', () => {
     const many = Array.from({ length: 9 }, (_, i) => title(`movie:${50 + i}`));
-    expect(pickFeatured({ moment: 'Noche', entries: [], titles: {}, seen: new Set(), discovered: many })).toHaveLength(5);
+    expect(pickFeatured({ kind: 'movie', entries: [], titles: {}, seen: new Set(), discovered: many })).toHaveLength(5);
   });
 });
 

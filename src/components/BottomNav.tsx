@@ -9,6 +9,7 @@ import './BottomNav.css';
 const ITEMS: { to: string; label: string; icon: IconName; activeIcon: IconName }[] = [
   { to: '/', label: 'Inicio', icon: 'home', activeIcon: 'home-fill' },
   { to: '/explorar', label: 'Explorar', icon: 'search', activeIcon: 'search' },
+  { to: '/gustos', label: 'Gustos', icon: 'taste', activeIcon: 'taste-fill' },
   { to: '/lista', label: 'Mi lista', icon: 'bookmark', activeIcon: 'bookmark-fill' },
   { to: '/avisos', label: 'Avisos', icon: 'bell', activeIcon: 'bell-fill' },
 ];

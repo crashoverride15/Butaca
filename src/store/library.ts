@@ -17,7 +17,7 @@ export const emptyEntry = (key: string, type: MediaType, now = Date.now()): Libr
 /** An entry with nothing in it is deleted (spec §5). */
 export function isEmptyEntry(e: LibraryEntry): boolean {
   const seenAny = Object.values(e.seenEpisodes).some((eps) => eps.length > 0);
-  return !e.inWatchlist && e.myScore === null && e.tagIds.length === 0 && e.seenAt === null && !seenAny;
+  return !e.inWatchlist && e.myScore === null && e.tagIds.length === 0 && e.seenAt === null && !seenAny && !e.notSeenAt;
 }
 
 export const getEntry = async (key: string) => (await getDb()).get('library', key);

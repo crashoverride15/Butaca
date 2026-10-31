@@ -2,16 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ensureRatings } from '../api/omdb';
 import { shortPlatformName } from '../api/tmdb';
-import { EYEBROW, type FeaturedItem, type Moment } from '../logic/featured';
+import { EYEBROW, type FeaturedItem, type Kind } from '../logic/featured';
 import { platformLabel } from '../logic/platform';
 import type { Provider, Title } from '../store/types';
 import { Artwork } from './Artwork';
 import { ImdbPill, RtPill } from './RatingPill';
 import './HeroCard.css';
 
-// Featured title of the moment — spec §8.9. Swipe between up to 5 candidates.
+// Featured title — spec §8.9. Swipe between up to 5 candidates.
 
-function Slide({ item, moment, mine }: { item: FeaturedItem; moment: Moment; mine: Provider[] }) {
+function Slide({ item, kind, mine }: { item: FeaturedItem; kind: Kind; mine: Provider[] }) {
   const [title, setTitle] = useState<Title>(item.title);
   useEffect(() => {
     let alive = true;
@@ -29,7 +29,7 @@ function Slide({ item, moment, mine }: { item: FeaturedItem; moment: Moment; min
       <div className="hero__shade" />
       <span className="hero__pill ellipsis">{item.pill}</span>
       <div className="hero__body">
-        <span className="hero__eyebrow">{EYEBROW[moment]}</span>
+        <span className="hero__eyebrow">{EYEBROW[kind]}</span>
         <span className="hero__title">{title.title}</span>
         <div className="hero__row">
           <span className="hero__meta ellipsis">{meta}</span>
@@ -43,14 +43,14 @@ function Slide({ item, moment, mine }: { item: FeaturedItem; moment: Moment; min
   );
 }
 
-export function HeroCard({ items, moment, mine }: { items: FeaturedItem[]; moment: Moment; mine: Provider[] }) {
+export function HeroCard({ items, kind, mine }: { items: FeaturedItem[]; kind: Kind; mine: Provider[] }) {
   const track = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
     setIndex(0);
     track.current?.scrollTo({ left: 0 });
-  }, [moment, items]);
+  }, [kind, items]);
 
   return (
     <div className="hero">
@@ -63,7 +63,7 @@ export function HeroCard({ items, moment, mine }: { items: FeaturedItem[]; momen
         }}
       >
         {items.map((it) => (
-          <Slide key={it.title.key} item={it} moment={moment} mine={mine} />
+          <Slide key={it.title.key} item={it} kind={kind} mine={mine} />
         ))}
       </div>
       {items.length > 1 && (

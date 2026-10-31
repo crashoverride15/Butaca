@@ -1,0 +1,38 @@
+.swipe-card {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 22px;
+  overflow: hidden;
+  background: var(--surface);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+}
+
+.swipe-card__stamp {
+  position: absolute;
+  top: 22px;
+  padding: 6px 12px;
+  border-radius: 10px;
+  border: 2px solid currentColor;
+  background: var(--overlay-glass);
+  font: 800 18px/1 var(--font-display);
+  letter-spacing: 1px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.swipe-card__stamp--right {
+  left: 18px;
+  color: #3dd68c;
+  transform: rotate(-8deg);
+}
+
+.swipe-card__stamp--left {
+  right: 18px;
+  color: var(--text);
+  transform: rotate(8deg);
+}

@@ -46,6 +46,8 @@ export interface LibraryEntry {
   seenAt: number | null;
   seenEpisodes: Record<string, number[]>;
   knownSeasons: number | null;
+  /** swiped left in Gustos: "I have not seen it" — keeps it out of the deck (D28) */
+  notSeenAt?: number | null;
   addedAt: number;
   updatedAt: number;
 }

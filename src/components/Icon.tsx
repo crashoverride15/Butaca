@@ -8,6 +8,9 @@ export type IconName =
   | 'bookmark-fill'
   | 'bell'
   | 'bell-fill'
+  | 'taste'
+  | 'taste-fill'
+  | 'close'
   | 'moon'
   | 'calendar'
   | 'bed'
@@ -22,7 +25,7 @@ export type IconName =
 const FILLED: ReadonlySet<IconName> = new Set(['play', 'star', 'heart']);
 
 // Selected tab variants (like SF Symbols' .fill): filled and stroked so the size matches the outline.
-const FILLED_AND_STROKED: ReadonlySet<IconName> = new Set(['home-fill', 'bookmark-fill', 'bell-fill']);
+const FILLED_AND_STROKED: ReadonlySet<IconName> = new Set(['home-fill', 'bookmark-fill', 'bell-fill', 'taste-fill']);
 
 function shapes(name: IconName) {
   switch (name) {
@@ -57,12 +60,16 @@ function shapes(name: IconName) {
       return <path d="M4 18h16M6 18v-6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v6M8 10V7M14 4h4l-4 4h4" />;
     case 'back':
       return <path d="M15 5l-7 7 7 7" strokeWidth={2.2} />;
+    case 'close':
+      return <path d="M6 6l12 12M18 6L6 18" />;
     case 'check':
       return <path d="M5 12l5 5 9-10" />;
     case 'play':
       return <path d="M7 4v16l13-8z" />;
     case 'star':
       return <path d="M12 2l3 6.5 7 .8-5.2 4.8 1.5 7L12 17.6 5.7 21l1.5-7L2 9.3l7-.8z" />;
+    case 'taste':
+    case 'taste-fill':
     case 'heart':
       return <path d="M12 21s-8-5.2-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 5.8-8 11-8 11z" />;
     case 'sort':

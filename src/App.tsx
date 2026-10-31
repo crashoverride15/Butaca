@@ -6,6 +6,7 @@ import { Ajustes } from './screens/Ajustes';
 import { Avisos } from './screens/Avisos';
 import { Explorar } from './screens/Explorar';
 import { Ficha } from './screens/Ficha';
+import { Gustos } from './screens/Gustos';
 import { Inicio } from './screens/Inicio';
 import { MiLista } from './screens/MiLista';
 import { RefreshProvider } from './hooks/useRefresh';
@@ -36,6 +37,7 @@ function Layout() {
         <Route path="/" element={<Inicio />} />
         <Route path="/titulo/:type/:id" element={<Ficha />} />
         <Route path="/explorar" element={<Explorar />} />
+        <Route path="/gustos" element={<Gustos />} />
         <Route path="/lista" element={<MiLista />} />
         <Route path="/avisos" element={<Avisos />} />
         <Route path="/ajustes" element={<Ajustes />} />
