@@ -3,7 +3,7 @@
   position: fixed;
   left: 21px;
   right: 21px;
-  /* in Safari; in a home-screen web app BottomNav.tsx anchors it to the screen */
+  /* in Safari */
   bottom: max(12px, calc(env(safe-area-inset-bottom) - 13px));
   z-index: 10;
   height: 62px;
@@ -73,4 +73,12 @@
 
 .bottom-nav.is-collapsed .bottom-nav__label {
   display: none;
+}
+
+/* Home-screen app: always 8 pt from the bottom edge. It relies on every page being scrollable (base.css, D37), which makes
+   iOS give the page the whole screen; before that the bar sat 58 pt higher on short pages like Inicio. */
+@media (display-mode: standalone) {
+  .bottom-nav {
+    bottom: 8px;
+  }
 }

@@ -14,48 +14,6 @@ const ITEMS: { to: string; label: string; icon: IconName; activeIcon: IconName }
   { to: '/avisos', label: 'Avisos', icon: 'bell', activeIcon: 'bell-fill' },
 ];
 
-// Distance from the bar to the physical bottom edge, like the system tab bar.
-const EDGE_GAP = 21;
-const MIN_GAP = 8;
-
-function isStandalone(): boolean {
-  return (
-    (navigator as Navigator & { standalone?: boolean }).standalone === true ||
-    window.matchMedia('(display-mode: standalone)').matches
-  );
-}
-
-// iOS 26+ home-screen web apps report a layout viewport shorter than the screen, as if
-// Safari's toolbar were still there, so `bottom` lands too high. Anchor to the screen instead.
-function useBottomOffset(): number | null {
-  const [offset, setOffset] = useState<number | null>(null);
-  const { pathname } = useLocation();
-  useEffect(() => {
-    if (!isStandalone()) return;
-    const update = () => {
-      const missing = Math.max(0, window.screen.height - window.innerHeight);
-      // never below the layout viewport: anything fixed outside it is clipped
-      setOffset(Math.max(MIN_GAP, EDGE_GAP - missing));
-    };
-    update();
-    // iOS settles the viewport a moment after the app opens or a screen changes: measure again until it does (D36)
-    const timers = [120, 400, 1000, 2500].map((ms) => window.setTimeout(update, ms));
-    const onShow = () => document.visibilityState === 'visible' && update();
-    window.addEventListener('resize', update);
-    window.addEventListener('pageshow', update);
-    document.addEventListener('visibilitychange', onShow);
-    window.visualViewport?.addEventListener('resize', update);
-    return () => {
-      timers.forEach((t) => window.clearTimeout(t));
-      window.removeEventListener('resize', update);
-      window.removeEventListener('pageshow', update);
-      document.removeEventListener('visibilitychange', onShow);
-      window.visualViewport?.removeEventListener('resize', update);
-    };
-  }, [pathname]);
-  return offset;
-}
-
 function useCollapsedOnScroll(): boolean {
   const [collapsed, setCollapsed] = useState(false);
   const { pathname } = useLocation();
@@ -79,7 +37,6 @@ interface BottomNavProps {
 }
 
 export function BottomNav({ hasUnreadAlerts = false }: BottomNavProps) {
-  const bottomOffset = useBottomOffset();
   const { pathname } = useLocation();
   // Collapsed it shows only the active tab: with none active (a title page) it stays open.
   const hasActive = ITEMS.some((i) => matchPath({ path: i.to, end: true }, pathname));
@@ -88,7 +45,6 @@ export function BottomNav({ hasUnreadAlerts = false }: BottomNavProps) {
     <nav
       className={'bottom-nav' + (collapsed ? ' is-collapsed' : '')}
       aria-label="Principal"
-      style={bottomOffset === null ? undefined : { bottom: bottomOffset }}
     >
       {ITEMS.map((item) => (
         <NavLink

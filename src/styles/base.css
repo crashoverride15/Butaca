@@ -20,7 +20,9 @@ body {
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
   overflow-x: hidden;
-  min-height: 100dvh;
+  /* always a little taller than the screen: a page that cannot scroll gets a viewport 58 pt short in a home-screen app
+     and the floating bar rides up (D37). --screen-h is set from JS (main.tsx); 100lvh is the fallback. */
+  min-height: calc(var(--screen-h, 100lvh) + 2px);
 }
 
 button,
