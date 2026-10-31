@@ -17,9 +17,11 @@ export function watchStatus(title: Title, entry: LibraryEntry | undefined, today
   return isSeriesSeen(entry, seasons) ? 'vista' : 'en_curso';
 }
 
-/** First aired episode not yet watched, walking the seasons in order. */
+export const RANDOM_TAG = 'momento:random';
+
+/** First aired episode not yet watched, walking the seasons in order. A series tagged Random is watched in no order: it has none. */
 export function nextEpisode(title: Title, entry: LibraryEntry | undefined, today: string): { season: number; episode: number } | null {
-  if (title.type !== 'tv') return null;
+  if (title.type !== 'tv' || entry?.tagIds.includes(RANDOM_TAG)) return null;
   const blank = entry ?? ({ seenEpisodes: {} } as LibraryEntry);
   for (const s of seasonsOf(title, today)) {
     for (let episode = 1; episode <= s.aired; episode++) {

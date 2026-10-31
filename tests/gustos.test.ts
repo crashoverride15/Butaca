@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { deckParams, isParked, markNotSeen, markSeen, markSeriesSeen, rankDeck } from '../src/logic/gustos';
+import { nextEpisode } from '../src/logic/status';
 import { isEmptyEntry, emptyEntry } from '../src/store/library';
 import type { TitleCard } from '../src/store/types';
 
@@ -60,5 +61,11 @@ describe('Gustos deck (D28)', () => {
     expect(out.seenEpisodes).toEqual({ 1: [1, 2], 2: [1, 2, 3] });
     expect(out).toMatchObject({ myScore: 8, tagIds: ['momento:noche', 'momento:maraton'], notSeenAt: null });
     expect(markSeriesSeen(emptyEntry('tv:1', 'tv', 0), three, null, null, []).seenEpisodes).toEqual({ 1: [1, 2], 2: [1, 2, 3], 3: [1, 2, 3, 4] });
+  });
+  it('a series tagged Random has no next episode (no order), any other keeps it', () => {
+    const title = { type: 'tv', seasons: [{ number: 1, episodeCount: 3, airDate: '2000-01-01' }], lastEpisodeToAir: { season: 1, episode: 3, airDate: '2000-02-01' } } as never;
+    const plain = { ...emptyEntry('tv:1', 'tv', 0), seenEpisodes: { 1: [1] } };
+    expect(nextEpisode(title, plain, '2026-10-31')).toEqual({ season: 1, episode: 2 });
+    expect(nextEpisode(title, { ...plain, tagIds: ['momento:random'] }, '2026-10-31')).toBeNull();
   });
 });

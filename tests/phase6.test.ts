@@ -86,17 +86,17 @@ describe('featured (D28: movies / series)', () => {
       entry('tv:5', { type: 'tv', inWatchlist: true }),
     ];
     const discovered = [title('movie:7', { genres: [{ id: 80, name: 'Crimen' }], year: 1997 }), title('tv:9', { type: 'tv' })];
-    const out = pickFeatured({ kind: 'movie', entries, titles, seen: new Set(['movie:1']), discovered });
+    const out = pickFeatured({ mine: [{ id: 119, name: 'Prime' }], kind: 'movie', entries, titles, seen: new Set(['movie:1']), discovered });
     expect(out.map((o) => o.title.key)).toEqual(['movie:2', 'movie:3', 'movie:7', 'movie:1']);
     expect(out[3].pill).toBe('Ya la has visto · tu nota 9');
     expect(out[0].pill).toMatch(/^Coincide con \d+ de tus gustos$/);
   });
   it('without a profile it offers the best IMDb of the discoveries and asks for tastes', () => {
     const discovered = [title('movie:7', { ratings: { imdb: 6, rt: null, fetchedAt: 1 } }), title('movie:8', { ratings: { imdb: 8.5, rt: null, fetchedAt: 1 } })];
-    const out = pickFeatured({ kind: 'movie', entries: [], titles: {}, seen: new Set(), discovered });
+    const out = pickFeatured({ mine: [{ id: 119, name: 'Prime' }], kind: 'movie', entries: [], titles: {}, seen: new Set(), discovered });
     expect(out[0].title.key).toBe('movie:8');
     expect(out[0].pill).toBe('Dime tus gustos para afinar');
-    expect(pickFeatured({ kind: 'movie', entries: [], titles: {}, seen: new Set(), discovered: [] })).toEqual([]);
+    expect(pickFeatured({ mine: [{ id: 119, name: 'Prime' }], kind: 'movie', entries: [], titles: {}, seen: new Set(), discovered: [] })).toEqual([]);
   });
   it('may offer a title I saw and rated 8 or more, saying so, at most two and never a weak one', () => {
     const entries = [
@@ -107,16 +107,23 @@ describe('featured (D28: movies / series)', () => {
     ];
     const t = { ...titles, 'movie:4': title('movie:4') };
     const discovered = Array.from({ length: 6 }, (_, i) => title(`movie:${60 + i}`, { genres: [{ id: 80, name: 'Crimen' }] }));
-    const out = pickFeatured({ kind: 'movie', entries, titles: t, seen: new Set(['movie:1', 'movie:2', 'movie:3', 'movie:4']), discovered });
+    const out = pickFeatured({ mine: [{ id: 119, name: 'Prime' }], kind: 'movie', entries, titles: t, seen: new Set(['movie:1', 'movie:2', 'movie:3', 'movie:4']), discovered });
     expect(out).toHaveLength(5);
     const again = out.filter((o) => o.pill.startsWith('Ya la has visto'));
     expect(again.map((o) => o.title.key)).toEqual(['movie:1', 'movie:2']);
     expect(again[0].pill).toBe('Ya la has visto · tu nota 9');
     expect(out.some((o) => o.title.key === 'movie:4')).toBe(false);
   });
+  it('never offers a title that is not on my platforms, seen or not', () => {
+    const elsewhere = title('movie:70', { providers: [{ id: 999, name: 'Otra' }] });
+    const entries = [entry('movie:70', { inWatchlist: true }), entry('movie:71', { myScore: 10, seenAt: 1 })];
+    const t = { ...titles, 'movie:70': elsewhere, 'movie:71': title('movie:71', { providers: [] }), 'movie:1': titles['movie:1'] };
+    const out = pickFeatured({ mine: [{ id: 119, name: 'Prime' }], kind: 'movie', entries: [...entries, entry('movie:1', { myScore: 9, seenAt: 1 })], titles: t, seen: new Set(['movie:71', 'movie:1']), discovered: [elsewhere, title('movie:72')] });
+    expect(out.map((o) => o.title.key).sort()).toEqual(['movie:1', 'movie:72']);
+  });
   it('gives at most five', () => {
     const many = Array.from({ length: 9 }, (_, i) => title(`movie:${50 + i}`));
-    expect(pickFeatured({ kind: 'movie', entries: [], titles: {}, seen: new Set(), discovered: many })).toHaveLength(5);
+    expect(pickFeatured({ mine: [{ id: 119, name: 'Prime' }], kind: 'movie', entries: [], titles: {}, seen: new Set(), discovered: many })).toHaveLength(5);
   });
 });
 

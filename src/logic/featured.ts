@@ -1,3 +1,4 @@
+import { myProviders } from './platform';
 import { pairScore, type Ref } from './similar';
 import type { LibraryEntry, Provider, Title } from '../store/types';
 
@@ -78,13 +79,17 @@ export interface FeaturedInput {
   seen: ReadonlySet<string>;
   /** `discover` results on my platforms already loaded */
   discovered: Title[];
+  /** my platforms: nothing that is not on one of them is ever offered */
+  mine: Provider[];
 }
 
 /** Up to 5 candidates: my watchlist first, then discoveries on my platforms; empty = show the empty state. */
 export function pickFeatured(input: FeaturedInput): FeaturedItem[] {
-  const { kind, entries, titles, seen, discovered } = input;
+  const { kind, entries, seen, discovered, mine } = input;
+  const onMine = (t: Title | undefined): t is Title => !!t && myProviders(t, mine).length > 0;
+  const titles = Object.fromEntries(Object.entries(input.titles).filter(([, t]) => onMine(t)));
   const profile = buildKindProfile(kind, entries, titles);
-  const ofKind = discovered.filter((t) => t.type === kind && !seen.has(t.key));
+  const ofKind = discovered.filter((t) => onMine(t) && t.type === kind && !seen.has(t.key));
 
   if (profile.refs.length === 0) {
     // No taste yet: the best IMDb among recent discoveries.

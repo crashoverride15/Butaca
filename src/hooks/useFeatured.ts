@@ -48,7 +48,7 @@ export function useFeatured(kind: Kind) {
           console.warn('[butaca] discover for the hero failed', e);
         }
       }
-      if (alive) setItems(pickFeatured({ kind, entries, titles, seen, discovered }));
+      if (alive) setItems(pickFeatured({ mine: settings.platforms, kind, entries, titles, seen, discovered }));
     })();
     return () => {
       alive = false;
