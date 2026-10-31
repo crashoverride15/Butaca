@@ -48,20 +48,31 @@ export function saveFilters(f: ExploreFilters, storage: Pick<Storage, 'setItem'>
 
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 
-/** Manual style tags that match a TMDB genre by name filter the catalogue (`with_genres`). */
-export function genreIdsForTags(tags: Tag[], genres: { id: number; name: string }[]): number[] {
-  const ids: number[] = [];
+/** Style tags whose TMDB genre has another name (or none) for series: TMDB's series genres are different from its film ones. */
+const GENRE_SYNONYMS: Record<string, { movie: number[]; tv: number[] }> = {
+  accion: { movie: [28], tv: [10759] }, // series: "Action & Adventure"
+  thriller: { movie: [53], tv: [9648, 80] }, // series have no thriller: mystery or crime
+  policiaca: { movie: [80], tv: [80] },
+  misterio: { movie: [9648], tv: [9648] },
+  comedia: { movie: [35], tv: [35] },
+};
+
+/** For each style tag TMDB can filter by, the genre ids that satisfy it (any of them). Tags it cannot filter by are left out. */
+export function genreSetsForTags(tags: Tag[], genres: { id: number; name: string }[], type: 'movie' | 'tv' = 'movie'): number[][] {
+  const sets: number[][] = [];
   for (const t of tags) {
     if (t.group !== 'estilo') continue;
-    const genre = genres.find((g) => norm(g.name) === norm(t.name));
-    if (genre) ids.push(genre.id);
+    const synonym = GENRE_SYNONYMS[norm(t.name)]?.[type];
+    const byName = genres.find((g) => norm(g.name) === norm(t.name));
+    const ids = synonym ?? (byName ? [byName.id] : []);
+    if (ids.length > 0) sets.push(ids);
   }
-  return ids;
+  return sets;
 }
 
 /** Tags that cannot be asked of TMDB (moment, free, own styles): they reorder instead. */
-export const localOnlyTags = (tags: Tag[], genres: { id: number; name: string }[]): Tag[] =>
-  tags.filter((t) => t.group !== 'estilo' || !genres.some((g) => norm(g.name) === norm(t.name)));
+export const localOnlyTags = (tags: Tag[], genres: { id: number; name: string }[], type: 'movie' | 'tv' = 'movie'): Tag[] =>
+  tags.filter((t) => genreSetsForTags([t], genres, type).length === 0);
 
 const decadeStart = (e: Epoch): number => (e === '80s' ? 1980 : e === '90s' ? 1990 : e === '00s' ? 2000 : e === '10s' ? 2010 : 2020);
 
@@ -71,7 +82,7 @@ export const yearInEpochs = (year: number | null, epochs: Epoch[]): boolean =>
 export function discoverParams(
   f: ExploreFilters,
   mine: Provider[],
-  genreIds: number[],
+  genreSets: number[][],
 ): Record<string, string | number> {
   const chosen = (f.platformIds ?? mine.map((p) => p.id)).filter((id) => mine.some((p) => p.id === id));
   const ids = chosen.length > 0 ? chosen : mine.map((p) => p.id);
@@ -84,7 +95,8 @@ export function discoverParams(
     sort_by: f.order === 'nota' ? 'vote_average.desc' : 'popularity.desc',
   };
   if (ids.length > 0) params.with_watch_providers = ids.join('|');
-  if (genreIds.length > 0) params.with_genres = genreIds.join('|');
+  // every tag must hold: with one genre per tag TMDB can do the AND; otherwise it narrows by any and filterCards finishes the job
+  if (genreSets.length > 0) params.with_genres = genreSets.every((g) => g.length === 1) ? genreSets.map((g) => g[0]).join(',') : [...new Set(genreSets.flat())].join('|');
   if (f.epochs.length > 0) {
     const starts = f.epochs.map(decadeStart);
     const from = `${Math.min(...starts)}-01-01`;
@@ -115,9 +127,14 @@ export interface ResultRef {
   card: TitleCard;
 }
 
-/** Local filters applied to a page of results: epochs between chosen decades, and seen titles. */
-export function filterCards(cards: TitleCard[], f: ExploreFilters, library: Record<string, LibraryEntry>, isSeen: (e: LibraryEntry) => boolean): TitleCard[] {
-  return cards.filter((c) => yearInEpochs(c.year, f.epochs) && !(f.hideSeen && library[c.key] && isSeen(library[c.key])));
+/** Local filters applied to a page of results: epochs between chosen decades, seen titles and every chosen genre tag. */
+export function filterCards(cards: TitleCard[], f: ExploreFilters, library: Record<string, LibraryEntry>, isSeen: (e: LibraryEntry) => boolean, genreSets: number[][] = []): TitleCard[] {
+  return cards.filter(
+    (c) =>
+      yearInEpochs(c.year, f.epochs) &&
+      !(f.hideSeen && library[c.key] && isSeen(library[c.key])) &&
+      genreSets.every((set) => set.some((id) => c.genreIds.includes(id))),
+  );
 }
 
 /** "Recién llegadas": by when it appeared on my platforms; unknown ones last, by release year. */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  activeCount, affinity, DEFAULT_FILTERS, discoverParams, filterCards, genreIdsForTags, loadFilters, localOnlyTags, orderByAffinity,
+  activeCount, affinity, DEFAULT_FILTERS, discoverParams, filterCards, genreSetsForTags, loadFilters, localOnlyTags, orderByAffinity,
   orderByArrival, profileOf, saveFilters, yearInEpochs,
 } from '../src/logic/explore';
 import { emptyEntry } from '../src/store/library';
@@ -20,9 +20,9 @@ describe('discover query', () => {
     });
   });
   it('uses only the chosen platforms, genres and the best-note order', () => {
-    const p = discoverParams({ ...DEFAULT_FILTERS, platformIds: [337], order: 'nota' }, mine, [28, 80]);
+    const p = discoverParams({ ...DEFAULT_FILTERS, platformIds: [337], order: 'nota' }, mine, [[28], [80]]);
     expect(p.with_watch_providers).toBe('337');
-    expect(p.with_genres).toBe('28|80');
+    expect(p.with_genres).toBe('28,80'); // both genres at once
     expect(p.sort_by).toBe('vote_average.desc');
   });
   it('turns epochs into one date range for the right kind of title, then filters the decades in between locally', () => {
@@ -41,8 +41,18 @@ describe('discover query', () => {
 describe('tags in Explorar', () => {
   const tags = [tag('estilo:accion', 'Acción', 'estilo'), tag('estilo:procedimental', 'Procedimental', 'estilo'), tag('momento:noche', 'Noche', 'momento')];
   it('style tags that match a TMDB genre filter the catalogue; the rest reorder', () => {
-    expect(genreIdsForTags(tags, genres)).toEqual([28]);
+    expect(genreSetsForTags(tags, genres)).toEqual([[28]]);
     expect(localOnlyTags(tags, genres).map((t) => t.name)).toEqual(['Procedimental', 'Noche']);
+  });
+  it('series use their own genres: Acción is Action & Adventure, Thriller is mystery or crime; every tag must hold', () => {
+    const t = [tag('estilo:accion', 'Acción', 'estilo'), tag('estilo:thriller', 'Thriller', 'estilo'), tag('momento:random', 'Random', 'momento')];
+    expect(genreSetsForTags(t, genres, 'movie')).toEqual([[28], [53]]);
+    expect(genreSetsForTags(t, genres, 'tv')).toEqual([[10759], [9648, 80]]);
+    expect(localOnlyTags(t, genres, 'tv').map((x) => x.name)).toEqual(['Random']);
+    expect(discoverParams(DEFAULT_FILTERS, mine, [[10759], [9648, 80]]).with_genres).toBe('10759|9648|80');
+    const cards = [card(1, 2020, [16, 35]), card(2, 2020, [10759, 80]), card(3, 2020, [10759]), card(4, 2020, [9648])];
+    const keep = filterCards(cards, DEFAULT_FILTERS, {}, () => false, [[10759], [9648, 80]]);
+    expect(keep.map((c) => c.tmdbId)).toEqual([2]);
   });
   it('orders by what my tagged titles share, keeping the original order on ties', () => {
     const profile = profileOf([{ genres: [{ id: 80, name: 'Crimen' }], year: 1995 } as unknown as Title]);

@@ -5,7 +5,7 @@ import { LazyTile } from '../components/LazyTile';
 import { Segmented } from '../components/Segmented';
 import { titleToCard } from '../logic/cards';
 import {
-  discoverParams, filterCards, genreIdsForTags, loadFilters, localOnlyTags, orderByAffinity, orderByArrival,
+  discoverParams, filterCards, genreSetsForTags, loadFilters, localOnlyTags, orderByAffinity, orderByArrival,
   profileOf, saveFilters, type ExploreFilters, type Order,
 } from '../logic/explore';
 import { watchStatus, todayIso } from '../logic/status';
@@ -53,8 +53,8 @@ export function Explorar() {
 
   const genreNames = useMemo(() => Object.fromEntries(genres.map((g) => [g.id, g.name])), [genres]);
   const chosenTags = useMemo(() => tags.filter((t) => filters.tagIds.includes(t.id)), [tags, filters.tagIds]);
-  const genreIds = useMemo(() => genreIdsForTags(chosenTags, genres), [chosenTags, genres]);
-  const localTags = useMemo(() => localOnlyTags(chosenTags, genres), [chosenTags, genres]);
+  const genreSets = useMemo(() => genreSetsForTags(chosenTags, genres, filters.type), [chosenTags, genres, filters.type]);
+  const localTags = useMemo(() => localOnlyTags(chosenTags, genres, filters.type), [chosenTags, genres, filters.type]);
 
   const isSeen = useCallback(
     (e: LibraryEntry) => {
@@ -83,9 +83,9 @@ export function Explorar() {
       setLoading(true);
       setError(false);
       try {
-        const res = await discover(filters.type, discoverParams(filters, mine, genreIds), page);
+        const res = await discover(filters.type, discoverParams(filters, mine, genreSets), page);
         if (my !== run.current) return;
-        let items = filterCards(res.items, filters, library, isSeen);
+        let items = filterCards(res.items, filters, library, isSeen, genreSets);
         if (filters.order === 'nuevas') items = orderByArrival(items, await firstSeenMap(filters.type));
         if (fromList.length > 0) items = orderByAffinity(items, profileOf(fromList));
         if (my !== run.current) return;
@@ -98,11 +98,11 @@ export function Explorar() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [filters, mine, genreIds, library, fromList],
+    [filters, mine, genreSets, library, fromList],
   );
 
   // New query or new filters: start again from page 1.
-  const catalogueKey = JSON.stringify([filters, genreIds, mine.map((p) => p.id), fromList.length]);
+  const catalogueKey = JSON.stringify([filters, genreSets, mine.map((p) => p.id), fromList.length]);
   useEffect(() => {
     if (searching) return;
     run.current++;
