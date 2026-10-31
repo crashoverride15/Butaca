@@ -6,7 +6,7 @@ import './SeriesAnswerSheet.css';
 
 // A series answered "seen" in Gustos (D28): how far I got and how I watch it.
 
-export const WATCH_STYLES = ['Noche', 'Maratón', 'Random', 'Entre semana', 'Para dormirme'];
+export const WATCH_STYLES = ['Maratón', 'Random', 'Entre semana', 'Para dormirme'];
 
 interface Props {
   title: string;

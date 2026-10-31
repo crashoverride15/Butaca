@@ -94,7 +94,7 @@ function FichaBody({ title }: { title: Title }) {
         label: name === 'Para dormirme' ? 'Dormir' : name,
         run: () => void commit({ ...next, tagIds: [...next.tagIds, tagId('momento', name)] }),
       });
-      toast.show('¿Para qué momento?', [pick('Noche'), pick('Entre semana'), pick('Para dormirme')]);
+      toast.show('¿Para qué momento?', [pick('Maratón'), pick('Entre semana'), pick('Para dormirme')]);
     }
   };
 

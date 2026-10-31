@@ -38,15 +38,15 @@ describe('tags', () => {
     await ensureInitialTags();
     await ensureInitialTags();
     const tags = await listTags();
-    expect(tags).toHaveLength(13);
-    expect(tags.filter((t) => t.group === 'momento').map((t) => t.name)).toEqual(['Noche', 'Maratón', 'Random', 'Entre semana', 'Para dormirme']);
+    expect(tags).toHaveLength(12);
+    expect(tags.filter((t) => t.group === 'momento').map((t) => t.name)).toEqual(['Maratón', 'Random', 'Entre semana', 'Para dormirme']);
     expect(tags.find((t) => t.group === 'origen')?.name).toBe('Española');
   });
 
   it('rejects empty and duplicate names', async () => {
     await ensureInitialTags();
     expect(await createTag('   ', 'libre')).toEqual({ ok: false, reason: 'empty' });
-    expect(await createTag('noche', 'momento')).toEqual({ ok: false, reason: 'duplicate' });
+    expect(await createTag('random', 'momento')).toEqual({ ok: false, reason: 'duplicate' });
     expect((await createTag('Navidad', 'libre')).ok).toBe(true);
   });
 

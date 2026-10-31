@@ -5,7 +5,6 @@ import type { Tag, TagGroup } from './types';
 // Tags — spec §5. Initial set is created on first run.
 
 const INITIAL: { name: string; group: TagGroup }[] = [
-  { name: 'Noche', group: 'momento' },
   { name: 'Maratón', group: 'momento' },
   { name: 'Random', group: 'momento' },
   { name: 'Entre semana', group: 'momento' },
@@ -30,6 +29,20 @@ const slug = (s: string) =>
 
 export const tagId = (group: TagGroup, name: string) => `${group}:${slug(name)}`;
 
+// "Noche" was dropped (D30): existing installs lose it once, from every title that had it.
+const DROPPED = ['Noche'];
+const DROPPED_FLAG = 'butaca.tags.noche-dropped';
+
+async function dropOldTags(): Promise<void> {
+  try {
+    if (localStorage.getItem(DROPPED_FLAG)) return;
+    localStorage.setItem(DROPPED_FLAG, '1');
+  } catch {
+    return;
+  }
+  for (const name of DROPPED) await deleteTag(tagId('momento', name));
+}
+
 // Moment tags added after the first release: existing installs get them once (a deleted one stays deleted).
 const ADDED_LATER = ['Maratón', 'Random'];
 const ADDED_LATER_FLAG = 'butaca.tags.maraton-random';
@@ -52,7 +65,10 @@ async function topUpLaterTags(): Promise<void> {
 
 export async function ensureInitialTags(): Promise<void> {
   const db = await getDb();
-  if ((await db.count('tags')) > 0) return topUpLaterTags();
+  if ((await db.count('tags')) > 0) {
+    await topUpLaterTags();
+    return dropOldTags();
+  }
   const tx = db.transaction('tags', 'readwrite');
   INITIAL.forEach((t, order) => tx.store.put({ id: tagId(t.group, t.name), name: t.name, group: t.group, order }));
   await tx.done;
