@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ensureRatings } from '../api/omdb';
 import { discover, getTitle } from '../api/tmdb';
-import { buildKindProfile, discoverByKeywords, discoverParamsFor, pickFeatured, recommendedKeys, topKeywords, type FeaturedItem, type Kind } from '../logic/featured';
+import { buildKindProfile, discoverByKeywords, discoverParamsFor, moreForYou, pickFeatured, recommendedKeys, topKeywords, type FeaturedItem, type Kind } from '../logic/featured';
 import { parseKey } from '../logic/cards';
 import { todayIso, watchStatus } from '../logic/status';
 import { getAllEntries } from '../store/library';
@@ -11,7 +11,7 @@ import type { LibraryEntry, Provider, Title } from '../store/types';
 
 // Loads what the hero needs (spec §7.2): my titles, then — if the profile asks — a discover on my platforms.
 
-const MAX_DETAIL_LOADS = 40;
+const MAX_DETAIL_LOADS = 90;
 
 /** Details of these keys: cache first, then TMDB for at most `max` of the missing ones. */
 export async function loadTitles(keys: string[], max: number): Promise<Title[]> {
@@ -35,14 +35,14 @@ export async function loadTitles(keys: string[], max: number): Promise<Title[]> 
 export async function tasteCandidates(kind: Kind, profile: ReturnType<typeof buildKindProfile>, entries: LibraryEntry[], mine: Provider[], maxLoads = MAX_DETAIL_LOADS): Promise<Title[]> {
   const answered = new Set(entries.filter((e) => e.seenAt !== null || e.myScore !== null).map((e) => e.key));
   const keywords = topKeywords(profile);
+  // three pages of each: the wider the net, the better the best of it (D40)
+  const pages = [1, 2, 3];
   const [byPlot, byGenre] = await Promise.all([
-    keywords.length > 0 ? discover(kind, discoverByKeywords(keywords, mine), 1).catch(() => null) : null,
-    discover(kind, discoverParamsFor(profile, mine), 1).catch(() => null),
+    Promise.all(pages.map((p) => (keywords.length > 0 ? discover(kind, discoverByKeywords(keywords, mine), p).catch(() => null) : null))),
+    Promise.all(pages.map((p) => discover(kind, discoverParamsFor(profile, mine), p).catch(() => null))),
   ]);
-  const keys = [
-    ...recommendedKeys(profile, answered),
-    ...[...(byPlot?.items ?? []), ...(byGenre?.items ?? [])].slice(0, 20).map((c) => c.key),
-  ].filter((k) => !answered.has(k));
+  const found = [...byPlot, ...byGenre].flatMap((page) => page?.items ?? []).map((c) => c.key);
+  const keys = [...recommendedKeys(profile, answered), ...found].filter((k) => !answered.has(k));
   return loadTitles([...new Set(keys)], maxLoads);
 }
 
@@ -55,9 +55,16 @@ async function recentCandidates(kind: Kind, mine: Provider[]): Promise<Title[]> 
   return Promise.all(details.filter((t): t is Title => t !== null).map((t) => ensureRatings(t)));
 }
 
+export interface Featured {
+  /** the five on top */
+  items: FeaturedItem[];
+  /** the next best, for "Más para ti" */
+  more: FeaturedItem[];
+}
+
 export function useFeatured(kind: Kind) {
   const { settings } = useSettings();
-  const [items, setItems] = useState<FeaturedItem[] | null>(null);
+  const [items, setItems] = useState<Featured | null>(null);
   const platformKey = settings.platforms.map((p) => p.id).join(',');
 
   useEffect(() => {
@@ -86,7 +93,9 @@ export function useFeatured(kind: Kind) {
           console.warn('[butaca] candidates for the hero failed', e);
         }
       }
-      if (alive) setItems(pickFeatured({ mine: settings.platforms, kind, entries, titles, seen, discovered }));
+      const input = { mine: settings.platforms, kind, entries, titles, seen, discovered };
+      const top = pickFeatured(input);
+      if (alive) setItems({ items: top, more: moreForYou(input, new Set(top.map((t) => t.title.key))) });
     })();
     return () => {
       alive = false;

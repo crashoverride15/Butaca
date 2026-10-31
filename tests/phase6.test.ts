@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildKindProfile, EYEBROW, pickFeatured, recommendedKeys, topKeywords } from '../src/logic/featured';
+import { buildKindProfile, EYEBROW, moreForYou, pickFeatured, recommendedKeys, topKeywords } from '../src/logic/featured';
 import { diffSnapshot, isNew, noveltyDue, recentArrivals, relativeArrival, DAY_MS } from '../src/logic/novelties';
 import { runRefresh, refreshDue, REFRESH_INTERVAL_MS } from '../src/logic/refresh';
 import { isFollowed, seasonAlerts } from '../src/logic/seasons';
@@ -190,6 +190,17 @@ describe('featured (D28, D35: movies / series, by taste)', () => {
     const elsewhere = title('movie:70', { genres: crime, providers: [{ id: 999, name: 'Otra' }] });
     const out = pickFeatured({ mine, kind: 'movie', entries: [entry('movie:1', { myScore: 9, seenAt: 1 })], titles: { 'movie:1': fav }, seen: new Set(['movie:1']), discovered: [elsewhere, title('movie:72', { genres: crime })] });
     expect(out.map((o) => o.title.key)).toEqual(['movie:72']);
+  });
+  it('leaves out titles with too few votes, and "more for you" continues after the five on top', () => {
+    const crime = [{ id: 80, name: 'Crimen' }];
+    const fav = title('movie:1', { genres: crime, recommendations: Array.from({ length: 12 }, (_, i) => `movie:${40 + i}`) });
+    const discovered = [...Array.from({ length: 11 }, (_, i) => title(`movie:${40 + i}`, { genres: crime, voteCount: 5000 })), title('movie:51', { genres: crime, voteCount: 3 })];
+    const input = { mine, kind: 'movie' as const, entries: [entry('movie:1', { myScore: 9, seenAt: 1 })], titles: { 'movie:1': fav }, seen: new Set(['movie:1']), discovered };
+    const top = pickFeatured(input);
+    const more = moreForYou(input, new Set(top.map((t) => t.title.key)));
+    expect(top.length + more.length).toBe(11);
+    expect(more.some((m) => top.some((t) => t.title.key === m.title.key))).toBe(false);
+    expect([...top, ...more].some((x) => x.title.key === 'movie:51')).toBe(false);
   });
   it('gives at most five', () => {
     const many = Array.from({ length: 9 }, (_, i) => title(`movie:${50 + i}`));

@@ -13,7 +13,7 @@ import { useTitles } from '../hooks/useTitles';
 import { titleToCard } from '../logic/cards';
 import { formatEpisode } from '../logic/format';
 import { loadFilters, saveFilters } from '../logic/explore';
-import { KINDS, type Kind } from '../logic/featured';
+import { KINDS, type FeaturedItem, type Kind } from '../logic/featured';
 import { platformLabel } from '../logic/platform';
 import { relativeArrival } from '../logic/novelties';
 import { nextEpisode, todayIso, watchStatus } from '../logic/status';
@@ -113,6 +113,30 @@ function NoveltiesSection({ kind }: { kind: Kind }) {
   );
 }
 
+function MoreForYou({ items }: { items: FeaturedItem[] }) {
+  const { settings } = useSettings();
+  if (items.length === 0) return null;
+  return (
+    <section className="inicio__section" aria-labelledby="more-h">
+      <div className="inicio__head">
+        <h2 id="more-h" className="t-section ellipsis">Más para ti</h2>
+      </div>
+      <div className="carousel">
+        {items.map(({ title, pill }) => (
+          <LazyTile
+            key={title.key}
+            card={titleToCard(title)}
+            mine={settings.platforms}
+            genreNames={{}}
+            width={110}
+            captions={(t) => [platformLabel(t ?? title, settings.platforms) ?? '', pill]}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function Inicio() {
   const { settings } = useSettings();
   const [kind, setKind] = useKind();
@@ -141,7 +165,7 @@ export function Inicio() {
         <div className={'inicio__hero' + (featured === null ? ' is-loading' : '')}>
           {featured === null ? (
             <div className="skeleton" style={{ height: 220, borderRadius: 22 }} />
-          ) : featured.length === 0 ? (
+          ) : featured.items.length === 0 ? (
             <div className="screen-empty inicio__empty">
               <p>Cuéntame qué te gusta en Gustos y te recomiendo.</p>
               <button type="button" className="btn-primary pressable" style={{ height: 44 }} onClick={() => navigate('/gustos')}>
@@ -149,11 +173,11 @@ export function Inicio() {
               </button>
             </div>
           ) : (
-            <HeroCard items={featured} kind={kind} mine={settings.platforms} />
+            <HeroCard items={featured.items} kind={kind} mine={settings.platforms} />
           )}
         </div>
 
-        {kind === 'tv' && <MomentRows />}
+        {kind === 'tv' ? <MomentRows /> : <MoreForYou items={featured?.more ?? []} />}
         <ContinueSection />
         <NoveltiesSection kind={kind} />
       </main>

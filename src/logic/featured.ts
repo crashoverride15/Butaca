@@ -106,6 +106,9 @@ export interface FeaturedInput {
   mine: Provider[];
 }
 
+/** Fewer votes than this on TMDB: too obscure to offer. */
+export const MIN_VOTES = 100;
+
 export interface Ranked {
   title: Title;
   total: number;
@@ -126,7 +129,8 @@ export function rankByTaste(input: FeaturedInput): { ranked: Ranked[]; scores: R
   // watched or rated = already answered, whatever TMDB thinks
   const answered = new Set<string>(seen);
   for (const e of entries) if (e.seenAt !== null || e.myScore !== null || Object.keys(e.seenEpisodes).length > 0) answered.add(e.key);
-  const ofKind = discovered.filter((t) => onMine(t) && t.type === kind && !answered.has(t.key));
+  // obscure titles (few votes) are noise: the wider the net, the more it needs this
+  const ofKind = discovered.filter((t) => onMine(t) && t.type === kind && !answered.has(t.key) && (t.voteCount ?? Infinity) >= MIN_VOTES);
 
   const byKey = Object.fromEntries(entries.map((e) => [e.key, e]));
   const scores = Object.fromEntries(entries.map((e) => [e.key, e.myScore]));
@@ -176,6 +180,20 @@ export function pickFeatured(input: FeaturedInput): FeaturedItem[] {
   return out;
 }
 
+/** The next best after the ones already chosen, each saying which favourite of mine it follows from (D40). */
+export function moreForYou(input: FeaturedInput, exclude: ReadonlySet<string>, max = 20): FeaturedItem[] {
+  const result = rankByTaste(input);
+  if (!result) return [];
+  return result.ranked
+    .filter((c) => !exclude.has(c.title.key))
+    .slice(0, max)
+    .map((c) => {
+      const from = c.source?.title.key ?? '';
+      const mark = result.scores[from];
+      return { title: c.title, pill: c.source ? `Como ${c.source.title.title}${mark ? ` · ${mark}` : ''}` : 'Encaja con tus gustos' };
+    });
+}
+
 /** The themes my favourites share most: the plot-level way to ask TMDB for more of the same. */
 export function topKeywords(profile: Profile, max = 5): number[] {
   const count = new Map<number, number>();
@@ -188,11 +206,11 @@ export function topKeywords(profile: Profile, max = 5): number[] {
 }
 
 /** Candidates that my favourites lead to: what TMDB recommends for the ones I rated best, most-recommended first. */
-export function recommendedKeys(profile: Profile, exclude: ReadonlySet<string>, max = 40): string[] {
+export function recommendedKeys(profile: Profile, exclude: ReadonlySet<string>, max = 120): string[] {
   const count = new Map<string, number>();
-  const favourites = [...profile.refs].slice(0, 12);
+  const favourites = [...profile.refs].slice(0, 30);
   for (const { title } of favourites) {
-    for (const k of [...title.recommendations.slice(0, 10), ...title.similar.slice(0, 4)]) {
+    for (const k of [...title.recommendations.slice(0, 20), ...title.similar.slice(0, 6)]) {
       if (!exclude.has(k)) count.set(k, (count.get(k) ?? 0) + 1);
     }
   }

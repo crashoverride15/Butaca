@@ -27,7 +27,7 @@ const SHORT: Record<Pick, string> = {
   'momento:random': 'Random',
 };
 const PICKS = Object.keys(SHORT) as Pick[];
-const IN_ALL = 10;
+const IN_ALL = 15;
 
 function loadPick(): Pick {
   try {
