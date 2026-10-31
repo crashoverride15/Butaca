@@ -123,6 +123,15 @@ export interface FeaturedInput {
 
 /** Fewer votes than this on TMDB: too obscure to offer. */
 export const MIN_VOTES = 100;
+/** Never offered below this (D43): IMDb when known, else TMDB's average. */
+export const MIN_RATING = 6.5;
+
+/** Good enough to recommend: a known score of at least MIN_RATING; unknown passes until it is known. */
+export function goodEnough(t: Title): boolean {
+  if (t.ratings.imdb !== null) return t.ratings.imdb >= MIN_RATING;
+  if (t.voteAverage) return t.voteAverage >= MIN_RATING;
+  return true;
+}
 
 export interface Ranked {
   title: Title;
@@ -145,7 +154,7 @@ export function rankByTaste(input: FeaturedInput): { ranked: Ranked[]; scores: R
   const answered = new Set<string>(seen);
   for (const e of entries) if (e.seenAt !== null || e.myScore !== null || Object.keys(e.seenEpisodes).length > 0) answered.add(e.key);
   // obscure titles (few votes) are noise: the wider the net, the more it needs this
-  const ofKind = discovered.filter((t) => onMine(t) && t.type === kind && !answered.has(t.key) && (t.voteCount ?? Infinity) >= MIN_VOTES);
+  const ofKind = discovered.filter((t) => onMine(t) && t.type === kind && !answered.has(t.key) && (t.voteCount ?? Infinity) >= MIN_VOTES && goodEnough(t));
 
   const byKey = Object.fromEntries(entries.map((e) => [e.key, e]));
   const scores = Object.fromEntries(entries.map((e) => [e.key, e.myScore]));
@@ -181,7 +190,7 @@ export function pickFeatured(input: FeaturedInput): FeaturedItem[] {
     const answered = new Set<string>(seen);
     for (const e of entries) if (e.seenAt !== null || e.myScore !== null || Object.keys(e.seenEpisodes).length > 0) answered.add(e.key);
     const best = discovered
-      .filter((t) => myProviders(t, mine).length > 0 && t.type === kind && !answered.has(t.key))
+      .filter((t) => myProviders(t, mine).length > 0 && t.type === kind && !answered.has(t.key) && goodEnough(t))
       .sort((a, b) => (b.ratings.imdb ?? 0) - (a.ratings.imdb ?? 0));
     return best.slice(0, MAX_CANDIDATES).map((title) => ({ title, pill: 'Dime tus gustos para afinar' }));
   }

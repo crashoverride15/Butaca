@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ensureRatings } from '../api/omdb';
 import { discover, getTitle } from '../api/tmdb';
-import { buildKindProfile, discoverByKeywords, discoverParamsFor, moreForYou, pickFeatured, recommendedKeys, topKeywords, type FeaturedItem, type Kind } from '../logic/featured';
+import { buildKindProfile, discoverByKeywords, discoverParamsFor, moreForYou, pickFeatured, rankByTaste, recommendedKeys, topKeywords, type FeaturedInput, type FeaturedItem, type Kind } from '../logic/featured';
 import { parseKey } from '../logic/cards';
 import { todayIso, watchStatus } from '../logic/status';
 import { getAllEntries } from '../store/library';
@@ -62,6 +62,21 @@ export interface Featured {
   more: FeaturedItem[];
 }
 
+/** How many of the best candidates get their IMDb score asked before choosing (D43); kept a week. */
+const RATE_FIRST = 40;
+
+/**
+ * The input with the IMDb score of its best candidates (D43), so one rated low is dropped before it is offered,
+ * not after. OMDb has a daily allowance: only the first `max`, and each score is kept for a week.
+ */
+export async function withRatings(input: FeaturedInput, max = RATE_FIRST): Promise<FeaturedInput> {
+  const result = rankByTaste(input);
+  if (!result) return input;
+  const rated = await Promise.all(result.ranked.slice(0, max).map((c) => ensureRatings(c.title).catch(() => c.title)));
+  const byKey = new Map(rated.map((t) => [t.key, t]));
+  return { ...input, discovered: input.discovered.map((t) => byKey.get(t.key) ?? t) };
+}
+
 export function useFeatured(kind: Kind) {
   const { settings } = useSettings();
   const [items, setItems] = useState<Featured | null>(null);
@@ -93,7 +108,7 @@ export function useFeatured(kind: Kind) {
           console.warn('[butaca] candidates for the hero failed', e);
         }
       }
-      const input = { mine: settings.platforms, kind, entries, titles, seen, discovered };
+      const input = await withRatings({ mine: settings.platforms, kind, entries, titles, seen, discovered });
       const top = pickFeatured(input);
       if (alive) setItems({ items: top, more: moreForYou(input, new Set(top.map((t) => t.title.key))) });
     })();

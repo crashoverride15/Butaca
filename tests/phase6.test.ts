@@ -141,6 +141,20 @@ describe('featured (D28, D35: movies / series, by taste)', () => {
     expect(EYEBROW.movie).toBe('PELÍCULA PARA TI');
     expect(EYEBROW.tv).toBe('SERIE PARA TI');
   });
+  it('never offers a title rated below 6.5: IMDb first, TMDB when IMDb is unknown (D43)', () => {
+    const crime = [{ id: 80, name: 'Crimen' }];
+    const fav = title('movie:1', { genres: crime, keywords: [1, 2, 3], recommendations: ['movie:7', 'movie:8', 'movie:9', 'movie:10'] });
+    const entries = [entry('movie:1', { myScore: 9, seenAt: 1 })];
+    const r = (imdb: number | null) => ({ imdb, rt: null, fetchedAt: 1 });
+    const discovered = [
+      title('movie:7', { genres: crime, ratings: r(4.6) }),
+      title('movie:8', { genres: crime, ratings: r(null), voteAverage: 5.9 }),
+      title('movie:9', { genres: crime, ratings: r(7.1), voteAverage: 5 }), // IMDb wins
+      title('movie:10', { genres: crime, ratings: r(null) }), // nothing known yet
+    ];
+    const out = pickFeatured({ kind: 'movie', entries, titles: { 'movie:1': fav }, seen: new Set(), discovered, mine });
+    expect(out.map((i) => i.title.key).sort()).toEqual(['movie:10', 'movie:9']);
+  });
   it('what I rated 1 to 4 pushes away what is like it (D41)', () => {
     const crime = [{ id: 80, name: 'Crimen' }];
     const fav = title('movie:1', { genres: crime, keywords: [1, 2, 3], recommendations: ['movie:7', 'movie:8'] });

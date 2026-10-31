@@ -7,7 +7,7 @@ import { getAllEntries } from '../store/library';
 import { useSettings } from '../store/SettingsContext';
 import { getTitleCached } from '../store/titles';
 import type { LibraryEntry, Title } from '../store/types';
-import { tasteCandidates } from './useFeatured';
+import { tasteCandidates, withRatings } from './useFeatured';
 
 // The three rows of Inicio → Series (D39): new series on my platforms, by what suits each moment.
 
@@ -79,7 +79,8 @@ export function useMomentRows(): MomentRow[] | null {
           return;
         }
         const discovered = await tasteCandidates('tv', profile, entries, settings.platforms, CANDIDATE_LOADS);
-        const result = rankByTaste({ mine: settings.platforms, kind: 'tv', entries, titles, seen, discovered });
+        const input = await withRatings({ mine: settings.platforms, kind: 'tv', entries, titles, seen, discovered }, STORY_READS);
+        const result = rankByTaste(input);
         const buckets = new Map<MomentId, MomentRowItem[]>(MOMENT_IDS.map((m) => [m, []]));
         // how their episodes tell the story (D42): read once per series, then kept
         const ranked = (result?.ranked ?? []).slice(0, STORY_READS);

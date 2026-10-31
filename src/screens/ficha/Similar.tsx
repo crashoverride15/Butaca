@@ -6,7 +6,7 @@ import { parseKey, titleToCard } from '../../logic/cards';
 import { platformLabel } from '../../logic/platform';
 import { candidateKeys, similarTo, type SimilarItem } from '../../logic/similar';
 import { todayIso, watchStatus } from '../../logic/status';
-import { discoverByKeywords } from '../../logic/featured';
+import { discoverByKeywords, goodEnough } from '../../logic/featured';
 import { estimateMoment } from '../../logic/seriesMoment';
 import { loadLabelled } from '../../hooks/useMomentRows';
 import { getAllEntries } from '../../store/library';
@@ -53,7 +53,8 @@ export function Similar({ title, mine }: { title: Title; mine: Provider[] }) {
       const byPlot = await discover(title.type, discoverByKeywords(title.keywords.slice(0, 8), mine), 1).catch(() => null);
       const plotKeys = title.keywords.length > 0 && mine.length > 0 ? (byPlot?.items ?? []).slice(0, 20).map((c) => c.key) : [];
       const keys = [...new Set([...candidateKeys(title, library), ...plotKeys])].filter((k) => k !== title.key);
-      const candidates = await loadCandidates(keys);
+      // never one rated below the floor (D43); a score that arrives later takes it off too
+      const candidates = (await loadCandidates(keys)).filter(goodEnough);
       const today = todayIso();
       const seen = new Set(candidates.filter((c) => watchStatus(c, library[c.key], today) === 'vista').map((c) => c.key));
       // series: the moment of those I have not classified, guessed from the ones I have (D41)
@@ -67,7 +68,11 @@ export function Similar({ title, mine }: { title: Title; mine: Provider[] }) {
       if (!alive) return;
       setItems(result);
       for (const item of result) {
-        void ensureRatings(item.title).then((t) => alive && setImdb((prev) => ({ ...prev, [t.key]: t.ratings.imdb })));
+        void ensureRatings(item.title).then((t) => {
+          if (!alive) return;
+          setImdb((prev) => ({ ...prev, [t.key]: t.ratings.imdb }));
+          if (!goodEnough(t)) setItems((prev) => prev?.filter((i) => i.title.key !== t.key) ?? null);
+        });
       }
     })();
     return () => {

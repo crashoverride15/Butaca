@@ -85,6 +85,7 @@ interface RawDetail {
   // D39
   tagline?: string;
   vote_count?: number;
+  vote_average?: number;
   popularity?: number;
   type?: string;
   number_of_episodes?: number;
@@ -156,6 +157,7 @@ export function mapTitle(type: MediaType, raw: RawDetail, now = Date.now(), prev
     tagline: raw.tagline || undefined,
     contentRating: contentRatingOf(raw),
     voteCount: raw.vote_count,
+    voteAverage: raw.vote_average,
     popularity: raw.popularity,
   };
   if (isTv) {

@@ -47,6 +47,8 @@ export interface Title {
   tagline?: string;
   contentRating?: string | null;
   voteCount?: number;
+  /** TMDB's average score, 0–10 (D43) */
+  voteAverage?: number;
   popularity?: number;
   // series only
   /** Scripted, Miniseries, Reality, Documentary... */
